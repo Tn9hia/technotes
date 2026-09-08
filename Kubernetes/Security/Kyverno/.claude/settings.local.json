@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:kyverno.io)",
+      "WebSearch",
+      "Bash(gh api *)",
+      "Bash(curl -s \"https://api.github.com/repos/kyverno/kyverno/security-advisories\")",
+      "Bash(curl -s \"https://api.github.com/repos/kyverno/kyverno/security-advisories?per_page=100\")",
+      "Bash(python3 -c ' *)"
+    ]
+  }
+}

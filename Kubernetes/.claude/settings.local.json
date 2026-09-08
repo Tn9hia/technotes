@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__notes-kodekloud__query_docs_filesystem_kode_kloud",
+      "Bash(grep -c '^```' '/Users/nghia/Library/CloudStorage/GoogleDrive-t.nghia2605@gmail.com/Other computers/My MacBook Air/GoogleDrive/my-note/Kubernetes/CKS-KodeKloud/Supply Chain Security.md')",
+      "Bash(grep -c '^```' '/Users/nghia/Library/CloudStorage/GoogleDrive-t.nghia2605@gmail.com/Other computers/My MacBook Air/GoogleDrive/my-note/Kubernetes/CKS-KodeKloud/Minimize Microservice Vulnerabilities.md')",
+      "Bash(grep -c '^```' '/Users/nghia/Library/CloudStorage/GoogleDrive-t.nghia2605@gmail.com/Other computers/My MacBook Air/GoogleDrive/my-note/Kubernetes/CKS-KodeKloud/Cluster Setup and Hardening.md')"
+    ]
+  }
+}

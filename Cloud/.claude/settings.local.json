@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs -I{} basename {})",
+      "Bash(awk -F: '{sum+=$2} END {print \"Total lines:\", sum}')"
+    ]
+  }
+}

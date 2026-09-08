@@ -1,0 +1,19 @@
+# Ignore everything at root
+/*
+
+# Whitelist folders
+!/Cloud
+!/DevOps
+!/Kubernetes
+!/Monitor
+!/Tech
+
+# Allow git recursive
+!/Cloud/**
+!/DevOps/**
+!/Kubernetes/**
+!/Monitor/**
+!/Tech/**
+
+# Keep .gitignore
+!/.gitignore

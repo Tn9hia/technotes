@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:gvisor.dev)",
+      "WebSearch",
+      "Bash(curl -s https://api.github.com/repos/google/gvisor/releases/latest)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(curl -s \"https://api.github.com/repos/google/gvisor/contents/g3doc\")",
+      "Bash(curl -s \"https://api.github.com/repos/google/gvisor/contents/g3doc/architecture_guide\")",
+      "Bash(curl -s \"https://api.github.com/repos/google/gvisor/contents/g3doc/user_guide\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/google/gvisor/master/SECURITY.md\")",
+      "WebFetch(domain:docs.cloud.google.com)"
+    ]
+  }
+}

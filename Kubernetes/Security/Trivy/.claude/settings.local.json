@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/nghia/Library/CloudStorage/GoogleDrive-t.nghia2605@gmail.com/Other computers/My MacBook Air/GoogleDrive/my-note/**)",
+      "Read(//Users/nghia/**)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:trivy.dev)",
+      "Bash(gh api *)",
+      "Bash(curl -s \"https://api.github.com/search/code?q=repo:aquasecurity/trivy+db.md+path:docs\")",
+      "Bash(curl -sL \"https://raw.githubusercontent.com/aquasecurity/trivy/main/docs/docs/references/configuration/db.md\")",
+      "Bash(curl -sL \"https://api.github.com/repos/aquasecurity/trivy/contents/docs\")",
+      "Bash(python3 -c \"import json,sys; [print\\(x['name']\\) for x in json.load\\(sys.stdin\\)]\")",
+      "Bash(curl -sL \"https://api.github.com/repos/aquasecurity/trivy/contents/docs/guide\")",
+      "Bash(python3 -c \"import json,sys; [print\\(x['name'], x['type']\\) for x in json.load\\(sys.stdin\\)]\")",
+      "Bash(curl -sL \"https://api.github.com/repos/aquasecurity/trivy/contents/docs/guide/configuration\")",
+      "Bash(curl *)",
+      "Bash(python3 -c \"import json,sys; [print\\(x['name'],x['type']\\) for x in json.load\\(sys.stdin\\)]\")",
+      "WebFetch(domain:aquasecurity.github.io)",
+      "Bash(curl -sL \"https://raw.githubusercontent.com/aquasecurity/trivy/main/docs/docs/references/configuration/cli/trivy_image.md\")",
+      "Bash(curl -sL \"https://api.github.com/repos/aquasecurity/trivy/contents/docs/guide/references/configuration\")",
+      "Bash(curl -sL \"https://api.github.com/repos/aquasecurity/trivy/contents/docs/guide/references/configuration/cli\")",
+      "Bash(curl -sL \"https://raw.githubusercontent.com/aquasecurity/trivy/main/docs/guide/references/configuration/cli/trivy_image.md\")",
+      "Bash(curl -sL \"https://raw.githubusercontent.com/aquasecurity/trivy/main/docs/guide/references/configuration/config-file.md\")"
+    ]
+  }
+}

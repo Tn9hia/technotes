@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:github.com)",
+      "WebSearch",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(gh api *)",
+      "Bash(curl -sL https://raw.githubusercontent.com/tomhuang12/awesome-k8s-resources/main/README.md -o /tmp/tomhuang12_readme.md)",
+      "Read(//tmp/**)",
+      "Bash(curl -sL https://api.github.com/repos/tomhuang12/awesome-k8s-resources)",
+      "Bash(curl -sL https://api.github.com/repos/tomhuang12/awesome-k8s-resources/contents/)",
+      "Bash(curl -sL https://raw.githubusercontent.com/tomhuang12/awesome-k8s-resources/main/readme.md -o /tmp/tomhuang12_readme.md)",
+      "Read(//private/tmp/**)",
+      "Bash(curl -sL https://api.github.com/repos/magnologan/awesome-k8s-security/contents/)",
+      "Bash(curl -sL https://raw.githubusercontent.com/magnologan/awesome-k8s-security/master/README.md -o /tmp/magnologan_readme.md)",
+      "Bash(curl -sL https://api.github.com/repos/pditommaso/awesome-k8s/contents/)",
+      "Bash(curl -sL https://raw.githubusercontent.com/pditommaso/awesome-k8s/master/README.md -o /tmp/pditommaso_readme.md)",
+      "Bash(curl -sL https://raw.githubusercontent.com/pditommaso/awesome-k8s/main/README.md -o /tmp/pditommaso_readme2.md)",
+      "WebFetch(domain:ramitsurana.github.io)",
+      "Bash(curl -s \"https://api.github.com/search/repositories?q=kubewarden+in:name\")",
+      "Bash(curl -s \"https://api.github.com/search/repositories?q=holmesgpt\")",
+      "Bash(curl -s \"https://api.github.com/repos/Tn9hia/awesome-kubernetes\")",
+      "Bash(curl -s \"https://api.github.com/repos/Tn9hia/awesome-kubernetes/contents/\")",
+      "Read(//Users/nghia/**)",
+      "Read(//Users/nghia/Documents/**)",
+      "Bash(git config *)",
+      "Bash(curl -sL https://raw.githubusercontent.com/tomhuang12/awesome-k8s-resources/main/contributing.md -o /tmp/tomhuang12_contributing.md)",
+      "Bash(curl -sL https://raw.githubusercontent.com/tomhuang12/awesome-k8s-resources/main/LICENSE -o /tmp/tomhuang12_LICENSE)",
+      "Bash(cp /tmp/tomhuang12_contributing.md \"/Users/nghia/Documents/code/awesome-kubernetes/contributing.md\")",
+      "Bash(cp /tmp/tomhuang12_LICENSE \"/Users/nghia/Documents/code/awesome-kubernetes/LICENSE\")",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)"
+    ]
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:man7.org)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:github.com)",
+      "Bash(curl -s https://api.github.com/repos/cncf/curriculum/contents/)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); [print\\(x['name']\\) for x in d if 'CKS' in x['name']]\")",
+      "Bash(curl -sL \"https://raw.githubusercontent.com/cncf/curriculum/master/CKS_Curriculum%20v1.34.pdf\" -o CKS_Curriculum.pdf)"
+    ]
+  }
+}

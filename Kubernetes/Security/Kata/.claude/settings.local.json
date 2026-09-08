@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebSearch",
+      "Bash(gh api *)",
+      "Bash(curl -s https://api.github.com/repos/kata-containers/kata-containers/contents/docs)",
+      "Bash(curl -s https://api.github.com/repos/kata-containers/kata-containers/contents/docs/how-to)",
+      "Bash(curl -s https://api.github.com/repos/kata-containers/kata-containers/contents/docs/design)",
+      "Bash(curl -s https://api.github.com/repos/kata-containers/kata-containers/contents/docs/install)",
+      "Bash(curl -s https://api.github.com/repos/kata-containers/kata-containers/contents/docs/threat-model)",
+      "Bash(curl -s https://api.github.com/repos/kata-containers/kata-containers/contents/docs/design/architecture_4.0)",
+      "Bash(curl -s \"https://api.github.com/search/code?q=repo:kata-containers/kata-containers+troubleshoot+in:path\")",
+      "Bash(curl -s https://api.github.com/repos/kata-containers/kata-containers/contents/src/runtime)",
+      "Bash(curl -s \"https://api.github.com/repos/kata-containers/kata-containers/contents/src/runtime/data\")",
+      "Bash(curl -sI https://raw.githubusercontent.com/kata-containers/kata-containers/main/docs/pod-annotations.md)",
+      "Bash(curl -s https://api.github.com/repos/kata-containers/kata-containers/contents/docs/pod-annotations.md)",
+      "Bash(curl -s https://raw.githubusercontent.com/kata-containers/kata-containers/main/docs/pod-annotations.md -o \"/private/tmp/claude-501/-Users-nghia-Library-CloudStorage-GoogleDrive-t-nghia2605-gmail-com-Other-computers-My-MacBook-Air-GoogleDrive-my-note-Security-Kata/2c47a69e-45df-4332-94fd-097c0ce3ed87/scratchpad/kata-docs/pod-annotations.md\")",
+      "Bash(curl -s https://raw.githubusercontent.com/kata-containers/kata-containers/main/docs/how-to/how-to-set-sandbox-config-kata.md -o \"/private/tmp/claude-501/-Users-nghia-Library-CloudStorage-GoogleDrive-t-nghia2605-gmail-com-Other-computers-My-MacBook-Air-GoogleDrive-my-note-Security-Kata/2c47a69e-45df-4332-94fd-097c0ce3ed87/scratchpad/kata-docs/how-to-set-sandbox-config-kata.md\")",
+      "Bash(curl -s https://api.github.com/repos/kata-containers/kata-containers/releases?per_page=6)",
+      "Bash(curl -s \"https://api.github.com/repos/kata-containers/kata-containers/releases\")"
+    ]
+  }
+}

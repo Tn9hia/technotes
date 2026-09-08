@@ -1,0 +1,16 @@
+VCF Operations has the following main functional areas:
+- **Fleet management**. Enables operational consistency and efficient resource management of the VCF infrastructure at scale.
+	- License Management
+	- Lifecycle Management
+	- Lifecycle Management
+	- Certificate Management
+	- Password Management
+	- Configuration Management
+	- Tag Management
+- **Operations management**. Provides monitoring and optimization of performance, cost and capacity, and faster troubleshooting.
+- **Workload operations**. Ensures that critical applications are running as expected.
+- **Performance monitoring**. Ensures applications have continuous access to resources
+- **FinOps and capacity**. Helps you analyze your infrastructure expenses and optimize capacity usage.
+- **Workload mobility**. Provides support for migrating and interconnecting workloads within and across VCF private cloud.
+- **Security management**. Provides security management to ensure that your VCF private cloud is operationally secure.
+- 
