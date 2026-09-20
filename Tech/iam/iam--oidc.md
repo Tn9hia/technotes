@@ -1,6 +1,6 @@
 # IAM — OpenID Connect (OIDC)
 Tier: 2
-Parent: [[Kubernetes/Security/iam/iam]]
+Parent: [[Tech/iam/iam]]
 Related: [[iam--oauth2]], [[iam--jwt]], [[iam--sso]], [[iam--saml]]
 Tags: #iam #oidc #federation #security
 

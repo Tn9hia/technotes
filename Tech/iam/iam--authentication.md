@@ -1,6 +1,6 @@
 # IAM — Authentication (AuthN)
 Tier: 2
-Parent: [[Kubernetes/Security/iam/iam]]
+Parent: [[Tech/iam/iam]]
 Related: [[iam--mfa]], [[iam--authorization]], [[iam--session-token-management]], [[iam--sso]]
 Tags: #iam #authentication #security
 

@@ -1,6 +1,6 @@
 # IAM — OAuth 2.0
 Tier: 2
-Parent: [[Kubernetes/Security/iam/iam]]
+Parent: [[Tech/iam/iam]]
 Related: [[iam--oidc]], [[iam--jwt]], [[iam--session-token-management]]
 Tags: #iam #oauth2 #federation #security
 

@@ -1,29 +1,33 @@
 # Ceph Cluster - Triển khai Primary và Secondary Storage cho CloudStack
 
-- **Bối cảnh và vấn đề**: CloudStack cần Primary Storage (nơi lưu volume/disk của VM, đòi hỏi performance và low-latency) và Secondary Storage (nơi lưu template, ISO, snapshot). Dựng hai storage system riêng biệt cho hai mục đích này tốn gấp đôi hạ tầng, trong khi ở quy mô nhỏ một cụm Ceph production-grade có thể phục vụ tốt cả hai vai trò nếu tách pool/service và giới hạn quyền truy cập đúng cách.
-- **Cách giải quyết**: Dùng `cephadm` triển khai một cụm Ceph 3 node (converged: mon + mgr + osd + mds trên cùng node) trên Ubuntu 24.04. Tạo pool RBD riêng (`cloudstack-primary`) làm Primary Storage cho KVM/CloudStack qua giao thức RBD. Triển khai CephFS + NFS-Ganesha (Ceph `nfs` module, có ingress VIP để HA) export ra làm Secondary Storage qua NFS. Toàn bộ cụm được hardening: cephx caps tối thiểu theo từng client, mã hoá dữ liệu tại chỗ (OSD dmcrypt), mã hoá đường truyền nội bộ (msgr v2 secure mode), tách network Public/Cluster/Management, và Dashboard chạy HTTPS với RBAC riêng.
-- **Kết quả sau khi hoàn thành**: CloudStack có một Primary Storage Pool chạy trên RBD và một Secondary Storage Pool chạy trên NFS, cùng share hạ tầng vật lý của một cụm Ceph 3 node. Admin thao tác OSD/pool qua `ceph orch`, không cần quản lý daemon thủ công. Người đọc nắm được lý do đằng sau từng tham số hardening để tự điều chỉnh khi lên production thật.
+- **Bối cảnh và vấn đề**: CloudStack cần Primary Storage (nơi lưu volume/disk của VM, đòi hỏi performance và low-latency) và Secondary Storage (nơi lưu template, ISO, snapshot). Dựng hai storage system riêng biệt cho hai mục đích này tốn gấp đôi hạ tầng, trong khi một cụm Ceph production-grade có thể phục vụ tốt cả hai vai trò nếu tách pool/service và giới hạn quyền truy cập đúng cách.
+- **Cách giải quyết**: Dùng `cephadm` triển khai một cụm Ceph 7 node trên Ubuntu 24.04, tách vai trò rõ ràng: 3 node (ceph-01/02/03) làm **control-plane + gateway** (mon + mgr + mds + nfs), 4 node (ceph-04..07) làm **storage node** thuần (chỉ chạy osd). Tạo pool RBD riêng (`cloudstack-primary`) làm Primary Storage cho KVM/CloudStack qua giao thức RBD. Triển khai CephFS + NFS-Ganesha (Ceph `nfs` module, có ingress VIP để HA trên 3 node gateway) export ra làm Secondary Storage qua NFS.
+- **Kết quả sau khi hoàn thành**: CloudStack có một Primary Storage Pool chạy trên RBD và một Secondary Storage Pool chạy trên NFS, cùng share hạ tầng vật lý của một cụm Ceph 7 node. Admin thao tác OSD/pool qua `ceph orch`, không cần quản lý daemon thủ công.
 
 > [!NOTE]
 > Lab này là một phần của series dựng cụm CloudStack production hoàn chỉnh — xem [[CloudStack Production Cluster - Lab Series Overview]] để biết thứ tự triển khai đầy đủ cùng các lab Control Plane, Compute Node, Tungsten Fabric SDN, Advanced Zone.
 
 > [!NOTE]
-> Lab này chọn kiến trúc **converged** (mon+mgr+osd+mds+nfs+rgw dùng chung 3 node) để tối ưu chi phí phần cứng cho một cụm nhỏ. Production lớn hơn nên tách riêng node cho gateway (RGW/NFS-Ganesha) khỏi node OSD để tránh cạnh tranh CPU/RAM lúc rebalance. Phần [Reference](#reference) có link tới kiến trúc scale-out khi cụm lớn hơn 3 node.
-
-> [!NOTE]
-> Về lựa chọn NFS hay S3 cho Secondary Storage: lab này triển khai **CephFS + NFS-Ganesha (native NFS)** làm phương án chính vì tương thích rộng với mọi phiên bản CloudStack (KVM host mount NFS trực tiếp, không cần lớp dịch nào ở giữa) và đơn giản hơn khi vận hành với một cụm nhỏ. Bước [Bước 8 - Triển khai RGW](#bước-8---tuỳ-chọn-triển-khai-rgw-làm-secondary-storage-dạng-s3) trình bày phương án S3 gốc (không qua NFS staging) như một lựa chọn thay thế để scale-out về sau. Phương án "S3 qua NFS staging" (kiểu cũ, CloudStack cache template ra NFS trước rồi đẩy lên S3) không được khuyến nghị vì cộng dồn độ phức tạp vận hành của cả NFS lẫn S3 mà không có lợi ích tương xứng ở quy mô nhỏ.
+> Lab này tách riêng node chạy daemon điều phối cụm (mon/mgr/mds/nfs) khỏi node chạy OSD ngay từ đầu, thay vì kiến trúc converged (mọi daemon dùng chung node) như ở cụm 3-node. Vì đã có đủ 7 node, việc tách này tránh cho control-plane bị cạnh tranh CPU/RAM với tải I/O của OSD lúc rebalance/scrub, đồng thời giúp scale storage (thêm node ceph-0N chỉ chạy osd) độc lập với scale control-plane.
 
 ## Prerequisites
 
 - **Hạ tầng**: CloudStack Management Server và ít nhất 1 KVM Cluster/Host đã cài đặt, add vào zone, đang ở trạng thái Up. DNS/NTP nội bộ hoạt động, các node Ceph resolve được lẫn nhau (qua DNS nội bộ hoặc `/etc/hosts`).
-- **Máy chủ / VM**: 3 node vật lý hoặc VM riêng biệt (không đặt chung host với hypervisor KVM đang chạy workload, tránh vòng lặp phụ thuộc storage). Cấu hình ví dụ dùng trong lab — điều chỉnh lại theo capacity thực tế:
+- **Máy chủ / VM**: 7 server Ubuntu 24.04 riêng biệt, không chạy service nào khác ngoài Ceph. Disk dùng cho OSD trong bài lab là disk ảo VMware; trên hạ tầng thật cần cấu hình passthrough (JBOD), không dùng RAID, để tối ưu hiệu năng và giữ đúng mô hình 1 OSD : 1 disk vật lý mà Ceph kỳ vọng.
 
-  | Node | CPU | RAM | OS disk | OSD disk |
-  | --- | --- | --- | --- | --- |
-  | ceph-node01/02/03 | 16 vCPU | 64 GB | 2x 480GB SSD (RAID1) | 4x 3.84TB SSD/NVMe (bluestore) |
+  | Host name | Vai trò | CPU - RAM - DISK |
+  | --- | --- | --- |
+  | ceph-01 | control-plane + gateway (mon, mgr, mds, nfs), label `_admin` | 4 vCPU - 8 GB - (OS 50GB) |
+  | ceph-02 | control-plane + gateway (mon, mgr, mds, nfs) | 4 vCPU - 8 GB - (OS 50GB) |
+  | ceph-03 | control-plane + gateway (mon, mgr, mds, nfs) | 4 vCPU - 8 GB - (OS 50GB) |
+  | ceph-04 | storage node (osd) | 4 vCPU - 8 GB - (OS 50GB, data 200GB x3) |
+  | ceph-05 | storage node (osd) | 4 vCPU - 8 GB - (OS 50GB, data 200GB x3) |
+  | ceph-06 | storage node (osd) | 4 vCPU - 8 GB - (OS 50GB, data 200GB x3) |
+  | ceph-07 | storage node (osd) | 4 vCPU - 8 GB - (OS 50GB, data 200GB x3) |
 
-- **Tài khoản và quyền**: user sudo trên cả 3 node để cài đặt và cho `cephadm` SSH vào orchestrate; nếu dùng internal CA, cần quyền request certificate cho Dashboard/RGW/NFS.
-- **Mạng**: dải Public network, Cluster network, Management network tách biệt (VLAN riêng) đã xin từ team Network — xem chi tiết placeholder ở bảng Planning bên dưới. Switch hỗ trợ Jumbo Frame nếu muốn bật MTU 9000 cho Cluster network.
+- **Tài khoản và quyền**: user sudo trên cả 7 node để cài đặt và cho `cephadm` SSH vào orchestrate.
+- **Mạng**: tách 2 dải mạng riêng biệt — mgt/user access network (SSH, cephadm orchestration, Dashboard, client RBD/NFS) và storage network (OSD replication/heartbeat). Storage network cần switch hỗ trợ Jumbo Frame, bật MTU 9000 để giảm CPU overhead và tránh phân mảnh gói tin khi replicate dữ liệu giữa các OSD. Chỉ 4 node storage (ceph-04..07) cần có interface trên storage network; 3 node control-plane/gateway chỉ cần mgt/user access network.
+- **NTP**: cần có NTP source nội bộ để đồng bộ thời gian giữa các node — cephx dùng timestamp chống replay attack, lệch giờ sẽ khiến node bị đá khỏi quorum (xem Bước 1).
 - **Kiến thức nền**: runbook này giả định người đọc đã biết Linux administration cơ bản, khái niệm TCP/IP, khái niệm Ceph (OSD/MON/MGR/PG/CRUSH) và khái niệm Zone/Pod/Cluster/Primary-Secondary Storage trong CloudStack — không giải thích lại từ đầu.
 
 > [!NOTE]
@@ -35,73 +39,97 @@
 
 | Thành phần | Giá trị | Ghi chú |
 | --- | --- | --- |
-| ceph-node01 hostname | `<TBD>` | mon + mgr + osd + mds, label thêm `_admin` (host bootstrap) |
-| ceph-node02 hostname | `<TBD>` | mon + mgr + osd + mds |
-| ceph-node03 hostname | `<TBD>` | mon + mgr + osd + mds |
-| Management network CIDR | `<TBD>` | SSH, cephadm orchestration, Dashboard HTTPS |
-| Public network CIDR | `<TBD>` | Client traffic: RBD (CloudStack/KVM), NFS, RGW |
-| Cluster network CIDR | `<TBD>` | Riêng biệt, không route ra ngoài — OSD replication/heartbeat |
+| ceph-01 hostname/IP | `<ip-node01>` | mon + mgr + mds + nfs, label `_admin` (node bootstrap) |
+| ceph-02 hostname/IP | `<ip-node02>` | mon + mgr + mds + nfs |
+| ceph-03 hostname/IP | `<ip-node03>` | mon + mgr + mds + nfs |
+| ceph-04 hostname/IP | `<ip-node04>` | osd, cluster-network IP `<cluster-ip-node04>` |
+| ceph-05 hostname/IP | `<ip-node05>` | osd, cluster-network IP `<cluster-ip-node05>` |
+| ceph-06 hostname/IP | `<ip-node06>` | osd, cluster-network IP `<cluster-ip-node06>` |
+| ceph-07 hostname/IP | `<ip-node07>` | osd, cluster-network IP `<cluster-ip-node07>` |
+| Mgt/Public network CIDR | `<mgt-network-cidr>` | SSH, cephadm orchestration, Dashboard HTTPS, client RBD/NFS |
+| Cluster/Storage network CIDR | `<cluster-network-cidr>` | Riêng biệt, không route ra ngoài — OSD replication/heartbeat, chỉ cấu hình trên ceph-04..07 |
 | MTU Cluster network | `9000` | Jumbo frame, giảm CPU overhead khi replicate giữa các OSD |
-| VIP NFS-Ganesha ingress | `<TBD>` | VIP HA cho Secondary Storage (NFS) |
-| VIP RGW ingress (tuỳ chọn) | `<TBD>` | VIP HA cho RGW nếu dùng phương án S3 |
-| Ceph release | `<xác nhận bản LTS mới nhất tại docs.ceph.com/en/latest/releases>` | Pin version cụ thể trước khi bootstrap, không dùng bản dev/rc cho production |
+| NTP server | `172.29.70.254` | Nguồn đồng bộ thời gian nội bộ, có thể thêm pool dự phòng nếu tổ chức có |
+| Harbor registry (image mirror) | `<harbor-registry>` | Mirror nội bộ cho image Ceph/Prometheus/Grafana, dùng khi node không ra được internet tới quay.io |
+| Ceph release | `20.2.4` (codename `tentacle`) | Pin version cụ thể trước khi bootstrap, không dùng bản dev/rc cho production |
+| VIP NFS-Ganesha ingress | `<nfs-vip>` | VIP HA cho Secondary Storage (NFS), chạy trên ceph-01/02/03 |
 | cephx client Primary Storage | `client.cloudstack-rbd` | caps giới hạn trong pool `cloudstack-primary` |
 | Pool Primary Storage | `cloudstack-primary` | replicated x3, min_size 2 |
 | CephFS volume Secondary Storage | `cloudstack-secondary` | data + metadata pool, replicated x3 |
 | NFS export path | `/cloudstack-secondary` | pseudo path export cho CloudStack Secondary Storage VM (SSVM) |
-| Secondary Storage client CIDR | `<TBD>` | Dải IP của SSVM + KVM host, dùng để giới hạn NFS export |
-| Dashboard admin user | `<TBD>` | Role `administrator`, không dùng chung tài khoản `admin` mặc định |
+| Secondary Storage client CIDR | `<secondary-storage-client-cidr>` | Dải IP của SSVM + KVM host, dùng để giới hạn NFS export |
+| Dashboard admin user | `<dashboard-admin-user>` | Role `administrator`, không dùng chung tài khoản `admin` mặc định |
 | SSH orchestration user | `ceph-adm` | User riêng cho `cephadm` SSH, không dùng `root` |
 
 ## Diagram
 
 ```mermaid
 flowchart TD
-    MGMT[CloudStack Management Server] -- "1. RBD + cephx" --> PUB["Ceph Public Network<br/>&lt;public-cidr&gt;"]
+    MGMT[CloudStack Management Server] -- "RBD + cephx" --> PUB["Mgt/Public Network<br/>&lt;mgt-network-cidr&gt;"]
     KVM[KVM Hypervisor Hosts] -- "librbd" --> PUB
-    SSVM[Secondary Storage VM] -- "2. NFSv4.1" --> VIP["NFS Ingress VIP<br/>&lt;nfs-vip&gt;"]
+    SSVM[Secondary Storage VM] -- "NFSv4.1" --> VIP["NFS Ingress VIP<br/>&lt;nfs-vip&gt;"]
 
-    PUB --> N1[ceph-node01<br/>mon+mgr+osd+mds]
-    PUB --> N2[ceph-node02<br/>mon+mgr+osd+mds]
-    PUB --> N3[ceph-node03<br/>mon+mgr+osd+mds]
+    PUB --> N1["ceph-01<br/>mon+mgr+mds+nfs<br/>label _admin"]
+    PUB --> N2[ceph-02<br/>mon+mgr+mds+nfs]
+    PUB --> N3[ceph-03<br/>mon+mgr+mds+nfs]
 
-    VIP --> NFS1[nfs-ganesha<br/>node01/node02]
-    NFS1 --> CFS[CephFS pool<br/>cloudstack-secondary]
+    VIP --> N1
+    VIP --> N2
+    VIP --> N3
+    N1 --> CFS[CephFS pool<br/>cloudstack-secondary]
+    N2 --> CFS
+    N3 --> CFS
 
-    N1 --> RBD[Pool cloudstack-primary<br/>replicated x3]
+    N1 -. "orchestrate qua SSH" .-> N4
+    N1 -. "orchestrate qua SSH" .-> N5
+    N1 -. "orchestrate qua SSH" .-> N6
+    N1 -. "orchestrate qua SSH" .-> N7
 
-    N1 -- "3. Cluster network<br/>replication/heartbeat" --> N2
-    N2 -- "3. Cluster network" --> N3
-    N1 -- "3. Cluster network" --> N3
+    N4[ceph-04<br/>osd x3 disk] --> RBD[Pool cloudstack-primary<br/>replicated x3]
+    N5[ceph-05<br/>osd x3 disk] --> RBD
+    N6[ceph-06<br/>osd x3 disk] --> RBD
+    N7[ceph-07<br/>osd x3 disk] --> RBD
+
+    N4 -- "Cluster network<br/>replication/heartbeat" --> N5
+    N5 -- "Cluster network" --> N6
+    N6 -- "Cluster network" --> N7
+    N4 -- "Cluster network" --> N7
 ```
 
 ---
 
 ## Installation
 
-### Bước 1 - Chuẩn bị hệ điều hành Ubuntu 24.04 trên 3 node
+### Bước 1 - Chuẩn bị hệ điều hành Ubuntu 24.04 trên 7 node
 
-Milestone này đưa 3 node về cùng baseline trước khi cephadm bắt đầu quản lý — sai NTP hoặc thiếu resolve hostname là hai nguyên nhân phổ biến nhất khiến bootstrap hoặc cephx auth thất bại.
+Bước này đưa 7 node về cùng baseline trước khi cephadm bắt đầu quản lý — sai NTP hoặc thiếu resolve hostname là hai nguyên nhân phổ biến nhất khiến bootstrap hoặc cephx auth thất bại.
 
 - Đặt hostname đúng theo Planning table (thực hiện trên từng node):
 
 ```bash
-sudo hostnamectl set-hostname <ceph-nodeXX-hostname>
+sudo hostnamectl set-hostname <ceph-XX>
 ```
 
-- Khai báo resolve giữa các node. Chỉnh sửa file `/etc/hosts` trên cả 3 node, thêm IP Public network của cả 3:
+- Khai báo resolve giữa các node. Chỉnh sửa file `/etc/hosts` trên cả 7 node, thêm IP mgt/public network của cả 7 node:
 
 ```text
-<public-ip-node01>  ceph-node01
-<public-ip-node02>  ceph-node02
-<public-ip-node03>  ceph-node03
+<ip-node01>  ceph-01
+<ip-node02>  ceph-02
+<ip-node03>  ceph-03
+<ip-node04>  ceph-04
+<ip-node05>  ceph-05
+<ip-node06>  ceph-06
+<ip-node07>  ceph-07
 ```
+
+- Với 4 node storage (ceph-04..07), cấu hình thêm interface/IP trên storage network (`<cluster-network-cidr>`, MTU 9000) ở tầng OS trước khi bootstrap — đây là interface Ceph sẽ tự dò để bind traffic replication.
 
 - Cài đặt và đồng bộ NTP bằng `chrony`. Cephx dùng timestamp để chống replay attack — lệch giờ quá `mon_clock_drift_allowed` (mặc định 50ms) sẽ khiến node bị đá khỏi quorum:
 
 ```bash
 sudo apt update
 sudo apt install -y chrony
+echo "pool 172.29.70.254 iburst" | sudo tee /etc/chrony/conf.d/local.conf
 sudo systemctl enable chrony --now
 chronyc tracking
 ```
@@ -117,16 +145,14 @@ echo "ceph-adm ALL=(ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/ceph-adm
 > [!NOTE]
 > `NOPASSWD:ALL` ở đây để `cephadm` tự động chạy lệnh qua SSH không cần nhập password tương tác. Nếu tổ chức yêu cầu chặt hơn, có thể giới hạn danh sách lệnh cụ thể trong sudoers, nhưng cần test kỹ vì `cephadm` gọi khá nhiều binary khác nhau (`systemctl`, container runtime, `mkdir`...).
 
-- Sinh SSH keypair trên node bootstrap (ceph-node01) và copy public key sang cả 3 node cho user `ceph-adm`:
+- Sinh SSH keypair trên node bootstrap (ceph-01) và copy public key vào chính ceph-01 cho user `ceph-adm` — đây là keypair sẽ được truyền cho `cephadm bootstrap` làm định danh SSH của cả cụm, nên chỉ cần tự-authorize trên node01 lúc này; các node còn lại sẽ nhận key này ở Bước 3 qua `ceph cephadm get-pub-key`:
 
 ```bash
 sudo -u ceph-adm ssh-keygen -t ed25519 -f /home/ceph-adm/.ssh/ceph-adm-key -N ""
-sudo -u ceph-adm ssh-copy-id -i /home/ceph-adm/.ssh/ceph-adm-key.pub ceph-adm@ceph-node01
-sudo -u ceph-adm ssh-copy-id -i /home/ceph-adm/.ssh/ceph-adm-key.pub ceph-adm@ceph-node02
-sudo -u ceph-adm ssh-copy-id -i /home/ceph-adm/.ssh/ceph-adm-key.pub ceph-adm@ceph-node03
+sudo -u ceph-adm ssh-copy-id -i /home/ceph-adm/.ssh/ceph-adm-key.pub ceph-adm@ceph-01
 ```
 
-- Cài đặt Podman làm container runtime cho `cephadm`. Ubuntu 24.04 có sẵn Podman trong repo chính thức nên không cần thêm repo bên thứ ba như khi cài Docker CE:
+- Cài đặt Podman làm container runtime cho `cephadm` (thực hiện trên cả 7 node):
 
 ```bash
 sudo apt install -y podman
@@ -137,41 +163,53 @@ sudo apt install -y podman
 ```bash
 sudo ufw default deny incoming
 sudo ufw default allow outgoing
-sudo ufw allow from <management-cidr> to any port 22 proto tcp
+sudo ufw allow from <mgt-network-cidr> to any port 22 proto tcp
 sudo ufw enable
 ```
 
 > [!WARNING]
-> Chạy `ufw enable` qua kết nối SSH từ xa có thể tự khoá bản thân nếu rule allow port 22 sai dải mạng. Luôn kiểm tra lại rule `allow ... port 22` trỏ đúng `<management-cidr>` trước khi enable.
+> Chạy `ufw enable` qua kết nối SSH từ xa có thể tự khoá bản thân nếu rule allow port 22 sai dải mạng. Luôn kiểm tra lại rule `allow ... port 22` trỏ đúng `<mgt-network-cidr>` trước khi enable.
 
-- Kiểm tra kết quả bước này trên cả 3 node:
+- Kiểm tra kết quả bước này trên cả 7 node:
 
 ```bash
 chronyc tracking | grep "Leap status"
-ssh ceph-adm@ceph-node02 hostname
+getent hosts ceph-04
 ```
 
-Kết quả mong đợi: `Leap status: Normal` và lệnh SSH từ node01 sang node02 chạy được không hỏi password.
+Kết quả mong đợi: `Leap status: Normal` trên mọi node, và mỗi node resolve được hostname của 6 node còn lại qua `/etc/hosts`.
 
 ### Bước 2 - Cài đặt cephadm và Bootstrap Ceph Cluster
 
-Bootstrap khởi tạo mon/mgr đầu tiên và sinh ra cephx admin keyring — đây là node sẽ giữ label `_admin`.
+Bootstrap khởi tạo mon/mgr đầu tiên trên ceph-01 và sinh ra cephx admin keyring — đây là node giữ label `_admin`.
 
-- Cài đặt `cephadm` trên ceph-node01, dùng đúng release đã xác nhận ở Planning table:
+- Cài đặt `cephadm` trên ceph-01, dùng đúng release đã xác nhận ở Planning table:
 
 ```bash
-CEPH_RELEASE=<ceph-release-đã-xác-nhận-tại-docs.ceph.com>
-curl --silent --remote-name --location https://raw.githubusercontent.com/ceph/ceph/$CEPH_RELEASE/src/cephadm/cephadm
+CEPH_RELEASE=20.2.4
+
+curl --silent --remote-name --location https://download.ceph.com/rpm-${CEPH_RELEASE}/el9/noarch/cephadm
 chmod +x cephadm
-sudo ./cephadm add-repo --release $CEPH_RELEASE
+
+sudo ./cephadm add-repo --release tentacle
 sudo ./cephadm install
+
+which cephadm
 ```
 
-- Bootstrap cluster với network và ssh-user đã chuẩn bị:
+- Login vào Harbor nội bộ và pull trước image Ceph để bootstrap không phải kéo trực tiếp từ quay.io:
+
+```bash
+sudo podman login https://<harbor-registry>/
+sudo podman pull <harbor-registry>/quay.io/ceph/ceph:v20.2.4
+```
+
+- Bootstrap cluster, trỏ image về Harbor mirror và dùng network/ssh-user đã chuẩn bị:
 
 ```bash
 sudo cephadm bootstrap \
-  --mon-ip <public-ip-node01> \
+  --image <harbor-registry>/quay.io/ceph/ceph:v20.2.4 \
+  --mon-ip <ip-node01> \
   --cluster-network <cluster-network-cidr> \
   --ssh-user ceph-adm \
   --ssh-private-key /home/ceph-adm/.ssh/ceph-adm-key \
@@ -183,7 +221,13 @@ sudo cephadm bootstrap \
 > [!WARNING]
 > Không gõ password trực tiếp trên command line — nó sẽ lưu lại trong `~/.bash_history` và trong output của `ps aux` lúc lệnh đang chạy. Tạo password trước bằng `openssl rand -base64 20 | sudo tee /root/ceph-dashboard.pass && sudo chmod 600 /root/ceph-dashboard.pass` rồi đọc lại qua `$(cat ...)` như trên, và xoá file này ngay sau khi bootstrap xong.
 
-- Cấu hình biến môi trường để dùng `ceph` CLI trực tiếp trên node bootstrap:
+- Cài thêm gói `ceph-common` để có sẵn lệnh `ceph` CLI ngay trên host, không cần vào `cephadm shell` mỗi lần — các bước sau của lab đều chạy `ceph ...` trực tiếp trên host bootstrap:
+
+```bash
+sudo cephadm install ceph-common
+```
+
+- Giới hạn quyền truy cập keyring admin, chỉ giữ trên node bootstrap:
 
 ```bash
 sudo cp /etc/ceph/ceph.client.admin.keyring /etc/ceph/ceph.client.admin.keyring.bak
@@ -199,43 +243,50 @@ sudo chmod 600 /etc/ceph/ceph.client.admin.keyring
 sudo ceph -s
 ```
 
-Kết quả mong đợi: `health: HEALTH_OK` (hoặc `HEALTH_WARN` với cảnh báo "1 mon" / "no OSDs" — bình thường ở giai đoạn này vì chưa thêm node và OSD).
+![[Pasted image 20260915173737.png]]
+
+Kết quả: `health: HEALTH_WARN` với cảnh báo "1 mon" là bình thường ở giai đoạn này vì chưa thêm node và OSD.
 
 ### Bước 3 - Thêm node vào cluster và gán label
 
-Label quyết định `cephadm` sẽ deploy daemon gì lên node nào ở các bước `orch apply` sau này.
+Label quyết định `cephadm` sẽ deploy daemon gì lên node nào ở các bước `orch apply` sau này — 3 node gateway nhận `mon,mgr,mds,nfs`, 4 node storage chỉ nhận `osd`.
 
-- Copy public key của cụm (được `cephadm` tự sinh lúc bootstrap) sang 2 node còn lại:
-
-```bash
-sudo ssh-copy-id -f -i /etc/ceph/ceph.pub ceph-adm@ceph-node02
-sudo ssh-copy-id -f -i /etc/ceph/ceph.pub ceph-adm@ceph-node03
-```
-
-- Thêm node02 và node03 vào cluster, gán label `mon,mgr,osd,mds`:
+- Lấy public key do `cephadm` dùng cho cluster (chính là `ceph-adm-key.pub` đã khai báo lúc bootstrap) và copy sang 6 node còn lại:
 
 ```bash
-sudo ceph orch host add ceph-node02 <public-ip-node02> --labels mon,mgr,osd,mds
-sudo ceph orch host add ceph-node03 <public-ip-node03> --labels mon,mgr,osd,mds
+sudo ceph cephadm get-pub-key > /etc/ceph/ceph.pub
+
+for h in ceph-02 ceph-03 ceph-04 ceph-05 ceph-06 ceph-07; do
+  sudo ssh-copy-id -f -i /etc/ceph/ceph.pub ceph-adm@$h
+done
 ```
 
-- Gán label cho node01 (đã có sẵn label `_admin` từ lúc bootstrap):
+- Thêm 2 node gateway còn lại, gán label `mon,mgr,mds,nfs`:
 
 ```bash
-sudo ceph orch host label add ceph-node01 mon
-sudo ceph orch host label add ceph-node01 mgr
-sudo ceph orch host label add ceph-node01 osd
-sudo ceph orch host label add ceph-node01 mds
+sudo ceph orch host add ceph-02 <ip-node02> --labels mon,mgr,mds,nfs
+sudo ceph orch host add ceph-03 <ip-node03> --labels mon,mgr,mds,nfs
 ```
 
-- Gán thêm label `nfs` cho node01 và node02 (2 node cho HA của NFS-Ganesha, dùng ở Bước 7):
+- Thêm 4 node storage, gán label `osd`:
 
 ```bash
-sudo ceph orch host label add ceph-node01 nfs
-sudo ceph orch host label add ceph-node02 nfs
+sudo ceph orch host add ceph-04 <ip-node04> --labels osd
+sudo ceph orch host add ceph-05 <ip-node05> --labels osd
+sudo ceph orch host add ceph-06 <ip-node06> --labels osd
+sudo ceph orch host add ceph-07 <ip-node07> --labels osd
 ```
 
-- Áp dụng placement cho mon/mgr theo label, đảm bảo đúng 3 mon để có quorum chịu được 1 node down:
+- Gán label cho ceph-01 (đã có sẵn label `_admin` từ lúc bootstrap):
+
+```bash
+sudo ceph orch host label add ceph-01 mon
+sudo ceph orch host label add ceph-01 mgr
+sudo ceph orch host label add ceph-01 mds
+sudo ceph orch host label add ceph-01 nfs
+```
+
+- Áp dụng placement cho mon/mgr theo label — cả 3 node gateway đều khớp label `mon`/`mgr`, đảm bảo đúng 3 mon để có quorum chịu được 1 node down:
 
 ```bash
 sudo ceph orch apply mon --placement="label:mon"
@@ -249,13 +300,42 @@ sudo ceph orch host ls
 sudo ceph -s
 ```
 
-Kết quả mong đợi: 3 host hiển thị đủ label, `ceph -s` báo `3 mons, quorum ceph-node01,ceph-node02,ceph-node03`.
+> [!NOTE]
+> Nếu gặp lỗi pull image (do node không ra được internet tới `quay.io`), kiểm tra và trỏ lại các image phụ trợ (`node-exporter`, `prometheus`, `alertmanager`, `grafana`) về Harbor mirror thay vì repo mặc định:
+>
+> ```bash
+> # Check config hiện tại đang trỏ đâu
+> sudo ceph config get mgr mgr/cephadm/container_image_node_exporter
+>
+> # Set lại về harbor mirror
+> sudo ceph config set mgr mgr/cephadm/container_image_node_exporter \
+>   <harbor-registry>/quay.io/prometheus/node-exporter:v1.9.1
+> sudo podman pull <harbor-registry>/quay.io/prometheus/node-exporter:v1.9.1
+>
+> # Tương tự cho các image còn lại
+> sudo ceph config set mgr mgr/cephadm/container_image_prometheus \
+>   <harbor-registry>/quay.io/prometheus/prometheus:v3.6.0
+> sudo ceph config set mgr mgr/cephadm/container_image_alertmanager \
+>   <harbor-registry>/quay.io/prometheus/alertmanager:v0.28.1
+> sudo ceph config set mgr mgr/cephadm/container_image_grafana \
+>   <harbor-registry>/quay.io/ceph/grafana:12.3.1
+> ```
+
+Kết quả mong đợi: 7 host hiển thị đủ label (3 node `mon,mgr,mds,nfs`, 4 node `osd`), `ceph -s` báo `3 mons, quorum ceph-01,ceph-02,ceph-03`.
+
+![[Pasted image 20260918011527.png]]
 
 ### Bước 4 - Triển khai OSD với mã hoá dữ liệu tại chỗ (dmcrypt)
 
-Milestone này đưa toàn bộ disk flash trống vào cụm dưới dạng OSD bluestore, mã hoá bằng LUKS ngay từ lúc tạo — mất chi phí CPU không đáng kể nhưng bảo vệ dữ liệu nếu disk vật lý bị tháo trộm khỏi node.
+Bước này đưa toàn bộ disk trống trên 4 node storage (ceph-04..07) vào cụm dưới dạng OSD bluestore, mã hoá bằng LUKS ngay từ lúc tạo — mất chi phí CPU không đáng kể nhưng bảo vệ dữ liệu nếu disk vật lý bị tháo trộm khỏi node.
 
-- Tạo file spec `osd-spec.yaml` trên node01:
+- Xem danh sách disk đang có trong cụm:
+
+```bash
+sudo ceph orch device ls
+```
+
+- Tạo file spec `osd-spec.yaml` trên ceph-01. Placement theo label `osd` nên spec này tự động chỉ áp dụng cho ceph-04..07, không đụng tới 3 node gateway:
 
 ```yaml
 service_type: osd
@@ -264,12 +344,29 @@ placement:
   label: "osd"
 spec:
   data_devices:
-    rotational: 0
+    rotational: 1
   encrypted: true
 ```
 
 > [!NOTE]
-> `rotational: 0` chọn mọi device flash (SSD/NVMe) đang ở trạng thái "available" (chưa có filesystem/partition) trên host có label `osd`. OS disk không bị chọn nhầm vì nó đã có filesystem từ lúc cài Ubuntu. `encrypted: true` bật dmcrypt full-disk — key LUKS được `cephadm`/`ceph-volume` tự sinh và lưu trong Monitor config-key store, không cần quản lý key thủ công.
+> `rotational: 1` chọn mọi device HDD đang ở trạng thái "available" (chưa có filesystem/partition) trên host có label `osd` (dùng `rotational: 0` nếu disk là SSD/NVMe). OS disk không bị chọn nhầm vì nó đã có filesystem từ lúc cài Ubuntu. `encrypted: true` bật dmcrypt full-disk — key LUKS được `cephadm`/`ceph-volume` tự sinh và lưu trong Monitor config-key store, không cần quản lý key thủ công.
+
+> [!NOTE]
+> Trong bài lab này chỉ có disk HDD nên chỉ dùng data device. Nếu có disk SSD/NVMe mix với disk HDD, có thể tách 1 OSD gồm disk SSD/NVMe làm DB/WAL trong khi disk HDD chứa data — giúp tăng **performance** của cụm:
+>
+> ```yaml
+> service_type: osd
+> service_id: cloudstack-osds
+> placement:
+>   label: "osd"
+> spec:
+>   data_devices:
+>     rotational: 1        # HDD → data
+>   db_devices:
+>     rotational: 0        # SSD/NVMe → WAL+DB riêng
+>   db_slots: 4             # 1 SSD share cho tối đa 4 HDD (tùy dung lượng SSD)
+>   encrypted: true
+> ```
 
 - Áp dụng spec:
 
@@ -287,7 +384,13 @@ sudo ceph orch device ls
 sudo ceph osd tree
 ```
 
-Kết quả mong đợi: mỗi node hiển thị 4 OSD `up`, tổng 12 OSD trên cả cụm, `ceph -s` chuyển dần về `HEALTH_OK` sau khi PG rebalance xong.
+Kết quả mong đợi: mỗi node ceph-04..07 hiển thị 3 OSD `up`, tổng 12 OSD trên 4 node storage, `ceph -s` chuyển dần về `HEALTH_OK` sau khi PG rebalance xong.
+
+![[Pasted image 20260916011221.png]]
+
+Cụm ở trạng thái healthy:
+
+![[Pasted image 20260919095343.png]]
 
 ### Bước 5 - Hardening authentication và network ở tầng cluster
 
@@ -302,9 +405,9 @@ sudo ceph config set global ms_client_mode secure
 ```
 
 > [!NOTE]
-> Mặc định msgr v2 chỉ bật `crc` mode (kiểm tra toàn vẹn, không mã hoá). `secure` mode mã hoá toàn bộ traffic giữa mon/osd/mds/client bằng AES-GCM — cần thiết nếu Cluster network hoặc Public network đi qua switch/segment không hoàn toàn tin cậy.
+> Mặc định msgr v2 chỉ bật `crc` mode (kiểm tra toàn vẹn, không mã hoá). `secure` mode mã hoá toàn bộ traffic giữa mon/osd/mds/client bằng AES-GCM — cần thiết vì traffic giữa 3 node gateway và 4 node storage đi qua mgt/public network dùng chung với các workload khác.
 
-- Vô hiệu hoá cơ chế `insecure global id reclaim` (liên quan CVE-2021-20288/CVE-2023-…, cho phép client giả mạo global_id sau khi mất kết nối mon):
+- Vô hiệu hoá cơ chế `insecure global id reclaim` (cho phép client giả mạo global_id sau khi mất kết nối mon):
 
 ```bash
 sudo ceph health detail | grep -i "insecure global id"
@@ -320,13 +423,19 @@ sudo ceph config set mon auth_allow_insecure_global_id_reclaim false
 sudo ceph config set mon mon_allow_pool_delete false
 ```
 
-- Mở firewall cho các port cần thiết của Ceph daemon trên Public network (thực hiện trên cả 3 node):
+- Mở firewall cho các port cần thiết của Ceph daemon trên mgt/public network. Trên 3 node gateway (ceph-01/02/03, chạy mon/mgr/mds):
 
 ```bash
-sudo ufw allow from <public-network-cidr> to any port 3300,6789 proto tcp comment 'ceph mon'
-sudo ufw allow from <public-network-cidr> to any port 6800:7300 proto tcp comment 'ceph osd/mds'
-sudo ufw allow from <management-network-cidr> to any port 8443 proto tcp comment 'ceph dashboard'
-sudo ufw allow from <management-network-cidr> to any port 9283 proto tcp comment 'ceph prometheus exporter'
+sudo ufw allow from <mgt-network-cidr> to any port 3300,6789 proto tcp comment 'ceph mon'
+sudo ufw allow from <mgt-network-cidr> to any port 6800:7300 proto tcp comment 'ceph mgr/mds'
+sudo ufw allow from <mgt-network-cidr> to any port 8443 proto tcp comment 'ceph dashboard'
+sudo ufw allow from <mgt-network-cidr> to any port 9283 proto tcp comment 'ceph prometheus exporter'
+```
+
+Trên 4 node storage (ceph-04..07, chạy osd):
+
+```bash
+sudo ufw allow from <mgt-network-cidr> to any port 6800:7300 proto tcp comment 'ceph osd'
 ```
 
 > [!NOTE]
@@ -354,7 +463,7 @@ sudo rbd pool init cloudstack-primary
 ```
 
 > [!NOTE]
-> `min_size 2` nghĩa là pool vẫn nhận write khi 1 trong 3 replica down (ví dụ đang bảo trì 1 node), nhưng sẽ block write nếu chỉ còn 1 bản sao — tránh write vào trạng thái không đủ redundancy. Số PG 128 phù hợp cho 12 OSD ở quy mô lab này; công thức và PG calculator tham khảo ở phần Reference khi scale cụm lớn hơn.
+> `min_size 2` nghĩa là pool vẫn nhận write khi 1 trong 3 replica down (ví dụ đang bảo trì 1 node storage), nhưng sẽ block write nếu chỉ còn 1 bản sao — tránh write vào trạng thái không đủ redundancy. Số PG 128 phù hợp cho 12 OSD ở quy mô lab này; công thức và PG calculator tham khảo ở phần Reference khi scale cụm lớn hơn.
 
 - Tạo cephx client riêng cho CloudStack, dùng `profile rbd` — caps chuẩn được Ceph khuyến nghị cho tích hợp RBD với hypervisor, chỉ cho phép thao tác trong đúng pool `cloudstack-primary`:
 
@@ -367,7 +476,7 @@ sudo ceph auth get-or-create client.cloudstack-rbd \
 > [!WARNING]
 > Không dùng `client.admin` cho CloudStack. Nếu key `client.cloudstack-rbd` bị lộ, kẻ tấn công chỉ thao tác được trong pool `cloudstack-primary`, không đọc/xoá được pool khác hay thay đổi cấu hình cụm.
 
-- Lấy secret key để khai báo vào CloudStack ở Bước 9 (không in ra terminal log tồn tại lâu dài):
+- Lấy secret key để khai báo vào CloudStack ở phần Kiểm tra kết quả (không in ra terminal log tồn tại lâu dài):
 
 ```bash
 sudo ceph auth print-key client.cloudstack-rbd
@@ -384,13 +493,13 @@ Kết quả mong đợi: lệnh `rbd ls` chạy được (trả về danh sách 
 
 ### Bước 7 - Triển khai CephFS + NFS-Ganesha cho CloudStack Secondary Storage
 
-- Tạo CephFS volume, `cephadm` tự tạo data pool + metadata pool và deploy MDS theo label:
+- Tạo CephFS volume, `cephadm` tự tạo data pool + metadata pool và deploy MDS theo label — 3 MDS trên ceph-01/02/03 (1 active, các node còn lại standby):
 
 ```bash
 sudo ceph fs volume create cloudstack-secondary --placement="label:mds"
 ```
 
-- Đặt replication cho 2 pool vừa tạo (mặc định kế thừa `osd_pool_default_size`, khai báo tường minh cho rõ ràng):
+- Đặt replication cho 2 pool vừa tạo (mặc định kế thừa `osd_pool_default_size`, khai báo tường minh cho rõ ràng). Dữ liệu và metadata vẫn nằm trên 4 node storage dù MDS chạy ở node gateway — CRUSH đặt OSD theo label `osd`, không liên quan tới node chạy MDS:
 
 ```bash
 sudo ceph osd pool set cephfs.cloudstack-secondary.data size 3
@@ -399,13 +508,13 @@ sudo ceph osd pool set cephfs.cloudstack-secondary.meta size 3
 sudo ceph osd pool set cephfs.cloudstack-secondary.meta min_size 2
 ```
 
-- Tạo NFS cluster (Ceph `nfs` module quản lý NFS-Ganesha như một service của orchestrator):
+- Tạo NFS cluster (Ceph `nfs` module quản lý NFS-Ganesha như một service của orchestrator), đặt trên cả 3 node gateway để tối đa HA:
 
 ```bash
 sudo ceph nfs cluster create cloudstack-nfs --placement="label:nfs"
 ```
 
-- Tạo export, giới hạn client theo CIDR của SSVM/KVM host thay vì mở cho toàn bộ Public network:
+- Tạo export, giới hạn client theo CIDR của SSVM/KVM host thay vì mở cho toàn bộ mgt/public network:
 
 ```bash
 sudo ceph nfs export create cephfs \
@@ -420,29 +529,29 @@ sudo ceph nfs export create cephfs \
 > Cú pháp `ceph nfs export create` có thể thay đổi nhẹ giữa các minor release — chạy `ceph nfs export create cephfs --help` để xác nhận tham số đúng với version đang cài trước khi apply.
 
 > [!WARNING]
-> Nếu bỏ trống `--client_addr`, export mặc định mở cho mọi client trên Public network đọc/ghi được toàn bộ Secondary Storage — luôn giới hạn rõ dải IP của SSVM và KVM host.
+> Nếu bỏ trống `--client_addr`, export mặc định mở cho mọi client trên mgt/public network đọc/ghi được toàn bộ Secondary Storage — luôn giới hạn rõ dải IP của SSVM và KVM host.
 
-- Triển khai ingress (haproxy + keepalived do `cephadm` quản lý) để có 1 VIP HA cho NFS thay vì trỏ thẳng vào IP của 1 node:
+- Triển khai ingress (haproxy + keepalived do `cephadm` quản lý) để có 1 VIP HA cho NFS, trải trên cả 3 node gateway thay vì trỏ thẳng vào IP của 1 node:
 
 ```yaml
 service_type: ingress
 service_id: nfs.cloudstack-nfs
 placement:
-  count: 2
+  label: "nfs"
 spec:
   backend_service: nfs.cloudstack-nfs
   frontend_port: 2049
   monitor_port: 9049
   virtual_ip: <nfs-vip>/<prefix>
   virtual_interface_networks:
-    - <public-network-cidr>
+    - <mgt-network-cidr>
 ```
 
 ```bash
 sudo ceph orch apply -i ingress-nfs.yaml
 ```
 
-- Mở firewall cho NFS trên Public network, chỉ cho phép từ dải client Secondary Storage:
+- Mở firewall cho NFS trên mgt/public network, chỉ cho phép từ dải client Secondary Storage, thực hiện trên cả 3 node gateway:
 
 ```bash
 sudo ufw allow from <secondary-storage-client-cidr> to any port 2049 proto tcp comment 'nfs-ganesha'
@@ -459,67 +568,7 @@ sudo umount /mnt
 
 Kết quả mong đợi: mount thành công, tạo/xoá file test không lỗi permission.
 
-### Bước 8 - (Tuỳ chọn) Triển khai RGW làm Secondary Storage dạng S3
-
-<!-- Milestone tham khảo, không bắt buộc cho lab chính — dùng khi muốn scale-out Secondary Storage bằng object storage thay vì NFS. -->
-
-- Triển khai RGW service theo label:
-
-```yaml
-service_type: rgw
-service_id: cloudstack-s3
-placement:
-  label: rgw
-spec:
-  rgw_frontend_port: 8080
-  rgw_realm: default
-  rgw_zone: default
-```
-
-```bash
-sudo ceph orch host label add ceph-node01 rgw
-sudo ceph orch host label add ceph-node02 rgw
-sudo ceph orch apply -i rgw-spec.yaml
-```
-
-- Triển khai ingress cho RGW, terminate TLS ngay tại haproxy bằng certificate từ internal CA (không dùng self-signed cho production):
-
-```yaml
-service_type: ingress
-service_id: rgw.cloudstack-s3
-placement:
-  count: 2
-spec:
-  backend_service: rgw.cloudstack-s3
-  frontend_port: 443
-  monitor_port: 9443
-  virtual_ip: <rgw-vip>/<prefix>
-  ssl_cert: |
-    <nội dung cert + key dạng PEM, nối liền nhau — lấy từ internal CA>
-```
-
-```bash
-sudo ceph orch apply -i ingress-rgw.yaml
-```
-
-- Tạo S3 user riêng cho CloudStack:
-
-```bash
-sudo radosgw-admin user create --uid=cloudstack-s3 --display-name="CloudStack Secondary Storage"
-```
-
-> [!NOTE]
-> Ghi lại `access_key`/`secret_key` trả về vào secret store — dùng để khai báo Secondary Storage trong CloudStack với `Protocol: S3`, `Endpoint: https://<rgw-vip>`, có TLS end-to-end vì ingress đã terminate HTTPS.
-
-- Kiểm tra kết quả bước này:
-
-```bash
-s3cmd --host=<rgw-vip> --host-bucket="%(bucket)s.<rgw-vip>" --access_key=<access-key> --secret_key=<secret-key> mb s3://cloudstack-test
-```
-
-Kết quả mong đợi: bucket tạo thành công, không lỗi TLS/certificate.
-
-### Bước 9 - Bảo mật Ceph Dashboard
+### Bước 8 - Bảo mật Ceph Dashboard
 
 - Cài certificate TLS thật từ internal CA thay vì self-signed mặc định:
 
@@ -557,20 +606,20 @@ sudo ceph config set mgr mgr/dashboard/session-expire 900
 
 ```bash
 sudo ceph dashboard ac-user-show
-curl -Iv https://<node01-ip>:8443 2>&1 | grep -i "subject\|issuer"
+curl -Iv https://<ip-node01>:8443 2>&1 | grep -i "subject\|issuer"
 ```
 
 Kết quả mong đợi: danh sách user gồm tài khoản administrator + read-only, không còn `admin` mặc định; certificate hiển thị đúng issuer là internal CA thay vì self-signed.
 
 ### Khai báo thông tin nhạy cảm
 
-- Các giá trị nhạy cảm trong lab này gồm: Dashboard admin password, cephx secret key của `client.cloudstack-rbd`, RGW access/secret key (nếu dùng Bước 8). Toàn bộ được sinh bằng `openssl rand`, lưu tạm ở `/root/*.pass` với quyền `600`, và phải được chuyển vào secret store của tổ chức (Vault, hoặc biến bí mật trong hệ thống CI/CD nếu về sau tự động hoá bằng Ansible/Terraform) rồi xoá file tạm:
+- Các giá trị nhạy cảm trong lab này gồm: Dashboard admin password, cephx secret key của `client.cloudstack-rbd`. Toàn bộ được sinh bằng `openssl rand`, lưu tạm ở `/root/*.pass` với quyền `600`, và phải được chuyển vào secret store của tổ chức (Vault, hoặc biến bí mật trong hệ thống CI/CD nếu về sau tự động hoá bằng Ansible/Terraform) rồi xoá file tạm:
 
 ```bash
 sudo shred -u /root/ceph-dashboard.pass /root/dashboard-admin.pass /root/dashboard-readonly.pass
 ```
 
-- cephx keyring `client.admin` (`/etc/ceph/ceph.client.admin.keyring`) chỉ tồn tại trên node có label `_admin`, quyền `600`, không đồng bộ ra ngoài cụm. Việc rotate key định kỳ nằm ngoài phạm vi lab này, tham khảo thêm ở [Reference](#reference).
+- cephx keyring `client.admin` (`/etc/ceph/ceph.client.admin.keyring`) chỉ tồn tại trên node có label `_admin` (ceph-01), quyền `600`, không đồng bộ ra ngoài cụm. Việc rotate key định kỳ nằm ngoài phạm vi lab này, tham khảo thêm ở [Reference](#reference).
 
 ## Kiểm tra kết quả
 
@@ -587,14 +636,14 @@ sudo ceph -s
   | Trường | Giá trị |
   | --- | --- |
   | Protocol | `RBD` |
-  | Server | `<public-ip-node01>,<public-ip-node02>,<public-ip-node03>` |
+  | Server | `<ip-node01>,<ip-node02>,<ip-node03>` |
   | Port | `6789` |
   | Path (pool) | `cloudstack-primary` |
   | CephX username | `cloudstack-rbd` |
   | CephX secret | `<secret-key-lấy-ở-bước-6>` |
 
 > [!NOTE]
-> CloudStack Agent trên KVM host tự động tạo libvirt secret từ username/secret khai báo ở trên (`virsh secret-define`) — admin không cần thao tác `virsh` thủ công.
+> Server khai báo là 3 mon (ceph-01/02/03) — client librbd tự chọn mon còn quorum để kết nối, không phụ thuộc 1 node duy nhất. CloudStack Agent trên KVM host tự động tạo libvirt secret từ username/secret khai báo ở trên (`virsh secret-define`) — admin không cần thao tác `virsh` thủ công.
 
 - Tạo thử một volume trên Primary Storage vừa add (qua UI: Storage → Volumes → Create Volume, chọn pool vừa thêm), sau đó xác nhận volume xuất hiện dưới dạng RBD image:
 
@@ -629,24 +678,17 @@ ssh <ssvm-ip> "df -h | grep cloudstack-secondary"
 
 ## Troubleshooting
 
-Không áp dụng - lab dựng mới theo hướng dẫn triển khai chuẩn, chưa có log lỗi thực tế phát sinh trong quá trình build để ghi nhận.
+Không áp dụng - lab dựng mới theo hướng dẫn triển khai chuẩn, chưa có log lỗi thực tế phát sinh trong quá trình build để ghi nhận. Riêng lỗi pull image từ `quay.io` do node không ra internet đã có hướng xử lý trong ghi chú ở Bước 3.
 
 ## Rollback
 
 - Gỡ Secondary/Primary Storage khỏi CloudStack trước (UI → Delete Secondary Storage / Primary Storage), tránh để CloudStack còn tham chiếu tới pool sắp xoá.
-- Gỡ export và NFS cluster:
+- Gỡ export, ingress và NFS cluster:
 
 ```bash
 sudo ceph nfs export delete cloudstack-nfs /cloudstack-secondary
 sudo ceph orch rm nfs.cloudstack-nfs
 sudo ceph orch rm ingress.nfs.cloudstack-nfs
-```
-
-- Gỡ RGW/ingress nếu đã triển khai Bước 8:
-
-```bash
-sudo ceph orch rm rgw.cloudstack-s3
-sudo ceph orch rm ingress.rgw.cloudstack-s3
 ```
 
 - Xoá CephFS volume (đồng thời xoá data + metadata pool):
@@ -666,14 +708,14 @@ sudo ceph config set mon mon_allow_pool_delete false
 > [!CAUTION]
 > Hai lệnh xoá pool và xoá CephFS volume ở trên **không thể hoàn tác** — toàn bộ volume/template/ISO đang lưu trong pool bị mất vĩnh viễn. Chỉ chạy sau khi đã xác nhận CloudStack không còn tham chiếu và dữ liệu đã được backup nếu cần giữ lại.
 
-- Nếu cần gỡ toàn bộ cụm (chỉ dùng khi phá bỏ lab, không áp dụng khi chỉ muốn xoá một phần):
+- Nếu cần gỡ toàn bộ cụm (chỉ dùng khi phá bỏ lab, không áp dụng khi chỉ muốn xoá một phần) — chạy trên node `_admin` (ceph-01), `--zap-osds` sẽ zap disk trên cả 4 node storage:
 
 ```bash
 sudo cephadm rm-cluster --fsid <fsid> --force --zap-osds
 ```
 
 > [!CAUTION]
-> `--zap-osds` xoá sạch dữ liệu trên toàn bộ disk OSD của cụm, không thể khôi phục. Không chạy lệnh này nếu chỉ muốn rollback một phần (ví dụ chỉ gỡ Secondary Storage).
+> `--zap-osds` xoá sạch dữ liệu trên toàn bộ disk OSD của cụm (ceph-04..07), không thể khôi phục. Không chạy lệnh này nếu chỉ muốn rollback một phần (ví dụ chỉ gỡ Secondary Storage).
 
 ## Reference
 
@@ -682,7 +724,6 @@ sudo cephadm rm-cluster --fsid <fsid> --force --zap-osds
 - [Ceph - CephX authentication and capabilities](https://docs.ceph.com/en/latest/rados/operations/user-management/)
 - [Ceph - Messenger v2 protocol (secure mode)](https://docs.ceph.com/en/latest/rados/configuration/msgr2/)
 - [Ceph - NFS module / NFS-Ganesha via cephadm](https://docs.ceph.com/en/latest/cephadm/services/nfs/)
-- [Ceph - RGW service via cephadm](https://docs.ceph.com/en/latest/cephadm/services/rgw/)
 - [Ceph - Ingress service (HA VIP for RGW/NFS)](https://docs.ceph.com/en/latest/cephadm/services/ingress/)
 - [Ceph Dashboard - Security and hardening](https://docs.ceph.com/en/latest/mgr/dashboard/)
 - [Ceph - Placement Group (PG) count calculator](https://docs.ceph.com/en/latest/rados/operations/placement-groups/)

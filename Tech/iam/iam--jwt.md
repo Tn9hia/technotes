@@ -1,6 +1,6 @@
 # IAM — JSON Web Token (JWT)
 Tier: 2
-Parent: [[Kubernetes/Security/iam/iam]]
+Parent: [[Tech/iam/iam]]
 Related: [[iam--oidc]], [[iam--oauth2]], [[iam--session-token-management]]
 Tags: #iam #jwt #security
 

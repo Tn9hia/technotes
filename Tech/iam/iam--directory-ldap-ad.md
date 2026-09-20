@@ -1,6 +1,6 @@
 # IAM — Directory Services (LDAP / Active Directory)
 Tier: 2
-Parent: [[Kubernetes/Security/iam/iam]]
+Parent: [[Tech/iam/iam]]
 Related: [[iam--authentication]], [[iam--scim-provisioning]], [[iam--sso]]
 Tags: #iam #ldap #active-directory #directory
 

@@ -9,7 +9,7 @@ tags:
 
 # Tungsten Fabric - Triển khai SDN Controller cho CloudStack
 
-- **Bối cảnh và vấn đề**: Advanced Zone của CloudStack cần một cơ chế isolation cho Guest network. VLAN truyền thống giới hạn 4094 network và không có control plane tập trung; native VXLAN của CloudStack tốt hơn về số lượng network nhưng vẫn thiếu các tính năng SDN nâng cao (distributed routing/firewall theo policy, overlay quản lý tập trung qua BGP/XMPP). Tungsten Fabric (TF) cung cấp lớp SDN đầy đủ, mã nguồn mở, có plugin tích hợp chính thức với CloudStack cho hypervisor KVM.
+- **Bối cảnh và vấn đề**: Advanced Zone của CloudStack cần một cơ chế isolation cho Guest network. VLAN truyền thống giới hạn 4094 network và không có control plane tập trung; native VXLAN của CloudStack tốt hơn về số lượng network nhưng vẫn thiếu các tính năng SDN nâng cao (distributed routing/firewall theo policy, overlay quản lý tập trung qua BGP/XMPP). Tungsten Fabric (TF) cung cấp lớp SDN đầy đủ, mã nguồn mở, có plugin tích hợp chính thức với CloudStack cho hypervisor KVM. Lý do đầy đủ và đánh đổi so với VXLAN/OVS thuần nằm ở phần [Quyết định kiến trúc](#quyết-định-kiến-trúc---vì-sao-chọn-tungsten-fabric) bên dưới.
 - **Cách giải quyết**: Dựng cụm TF controller 3 node (config + control + analytics + webui converged trên cùng node, theo đúng tinh thần cost-conscious của cả series) bằng `ansible-deployer` chính thức của dự án Tungsten Fabric, sau đó triển khai vRouter agent lên 3 KVM Compute Node đã chuẩn bị ở [[CloudStack Compute Node - Chuẩn bị KVM Hypervisor Host]] — vRouter chiếm interface Guest overlay đã để trống sẵn ở lab đó.
 - **Kết quả sau khi hoàn thành**: Cụm TF ở trạng thái tất cả service `active` (`contrail-status`), vRouter agent trên 3 compute node peer XMPP thành công với 3 control node. Đây là hạ tầng SDN sẵn sàng để [[CloudStack Advanced Zone - Triển khai Network SDN và Storage]] đăng ký làm Network Service Provider cho Zone.
 
@@ -18,6 +18,20 @@ tags:
 
 > [!NOTE]
 > Lab này **chỉ dựng hạ tầng TF**, chưa đụng tới CloudStack. Bước đăng ký TF làm Network Service Provider và tạo Physical Network dùng TF nằm ở [[CloudStack Advanced Zone - Triển khai Network SDN và Storage]].
+
+## Quyết định kiến trúc - Vì sao chọn Tungsten Fabric
+
+- **Advanced Zone không bắt buộc phải có SDN controller.** Isolation method cho Guest network là một lựa chọn độc lập với kiến trúc Zone: `VLAN` thuần (giới hạn 4094, do physical fabric xử lý — vẫn là Advanced Zone hợp lệ, không cần SDN gì cả), `VXLAN` (plugin native của CloudStack, mở namespace lên 16M nhưng vẫn chỉ là data-plane), hoặc cắm hẳn một SDN controller (Tungsten Fabric, Nuage, NSX...). Phần lớn CloudStack production hiện tại chạy VLAN hoặc VXLAN thuần, không SDN — lab này chủ động đi nhánh thứ ba.
+
+- **VXLAN plugin native chỉ đổi encapsulation, không có control plane.** CloudStack tự tạo interface `vxlan<VNI>` trên Linux bridge cho từng guest network, nhưng không có cơ chế nào học route hộ: traffic broadcast/unknown-unicast (BUM) phải dựa vào multicast PIM ở underlay switch (nhiều DC không muốn bật) hoặc danh sách unicast peer khai tay. Routing giữa các tier trong cùng 1 VPC luôn phải hairpin qua **1 VM Virtual Router** — VXLAN chỉ giải quyết bài toán "hết VLAN ID", không giải quyết bài toán scale/performance routing.
+
+- **Security ở Advanced Zone (VPC) chỉ còn ACL trên VR.** Security Group — cơ chế cô lập theo policy, distributed — chỉ dùng được ở Basic Zone hoặc Advanced Zone không-VPC. Một khi cần multi-tier (VPC/isolated network), toàn bộ security phụ thuộc Network ACL cấu hình trên đúng 1 VM VR: một điểm quản lý, cũng là một điểm nghẽn.
+
+- **Tungsten Fabric giải quyết cả 2 khoảng trống trên.** `vRouter` agent chạy trên từng compute node, học route qua XMPP từ Control Node theo đúng kiến trúc MPLS L3VPN/EVPN — routing giữa network/tier diễn ra ngay tại hypervisor nguồn, không hairpin qua VR. Network policy gắn theo tag/object và được enforce distributed trên mọi node, không còn phụ thuộc 1 VM ACL duy nhất. TF còn có BGP gateway thật (peer trực tiếp với router vật lý, mở đường cho multi-DC) và analytics node built-in cho visibility flow-level — hai thứ VXLAN plugin không có.
+
+- **TF chính là câu trả lời SDN mà OpenStack dùng cho cùng bài toán.** Tiền thân OpenContrail được Juniper xây riêng làm backend SDN cho Neutron, nay là dự án độc lập thuộc Linux Foundation Networking. Bản chất lựa chọn ở đây giống hệt lựa chọn bên OpenStack: Neutron ML2/OVS + VXLAN thuần (tương đương VXLAN plugin của CloudStack) so với Neutron cắm Contrail/TF làm backend (tương đương nhánh lab này). Đưa TF vào CloudStack là mang nguyên kiến trúc SDN cấp enterprise mà OpenStack production hay dùng sang, thay vì tự giới hạn ở mức data-plane thuần.
+
+- **Đánh đổi cần chấp nhận.** TF kéo theo một cụm control/config/analytics riêng (Cassandra/Zookeeper/RabbitMQ) — thêm hạ tầng, thêm vận hành/HA/patch so với VXLAN plugin (không cần thêm hạ tầng gì, chỉ là tính năng có sẵn của Linux bridge). Nếu không thật sự cần distributed routing, microsegmentation, hay BGP gateway/multi-DC, VXLAN hoặc thậm chí VLAN thuần vẫn là lựa chọn hợp lý hơn — đơn giản, ít thành phần để vận hành sai. Lab này chọn TF vì series nhắm tới kiến trúc production đầy đủ tính năng, không phải vì VXLAN plugin "kém" cho mọi quy mô.
 
 ## Prerequisites
 
@@ -113,19 +127,22 @@ Kết quả mong đợi: container chạy thành công, in ra thông báo "Hello
 
 ### Bước 2 - Cấu hình SSH cho node deployer
 
-- Trên `tf-controller01` (deployer), sinh SSH key và copy sang toàn bộ node còn lại kể cả 3 KVM host:
+> [!NOTE]
+> Khác với các lab trước (Ceph dùng `ceph-adm`, Control Plane thao tác qua `sudo`), lab này dùng thẳng `root` cho SSH giữa các node — vì `ansible-deployer` cần quyền root thật trên cả 3 KVM host để tạo interface `vhost0`, bind lại NIC vật lý vào vRouter và quản lý Docker, không chỉ chạy lệnh qua `sudo` từng phần như các lab khác. Chạy toàn bộ Bước 2-4 **khi đã là `root`** trên `tf-controller01` (không phải user thường rồi `sudo` từng lệnh) để `~/.ssh/tf-deployer-key` khớp đúng đường dẫn `/root/.ssh/tf-deployer-key` khai báo trong `instances.yaml` ở Bước 3.
+
+- Trên `tf-controller01` (deployer, đang là `root`), sinh SSH key và copy sang toàn bộ node còn lại kể cả 3 KVM host:
 
 ```bash
-ssh-keygen -t ed25519 -f ~/.ssh/tf-deployer-key -N ""
+ssh-keygen -t ed25519 -f /root/.ssh/tf-deployer-key -N ""
 for h in tf-controller02 tf-controller03 cloudstack-kvm01 cloudstack-kvm02 cloudstack-kvm03; do
-  ssh-copy-id -i ~/.ssh/tf-deployer-key.pub root@$h
+  ssh-copy-id -i /root/.ssh/tf-deployer-key.pub root@$h
 done
 ```
 
 - Kiểm tra kết quả bước này:
 
 ```bash
-ssh -i ~/.ssh/tf-deployer-key root@cloudstack-kvm01 hostname
+ssh -i /root/.ssh/tf-deployer-key root@cloudstack-kvm01 hostname
 ```
 
 Kết quả mong đợi: SSH chạy được không hỏi password.
@@ -233,8 +250,11 @@ ansible-playbook -i instances.yaml playbooks/install_contrail.yml
 - Kiểm tra kết quả bước này trên từng controller node:
 
 ```bash
-sudo docker exec -it $(sudo docker ps -qf name=config-api) contrail-status
+sudo docker exec $(sudo docker ps -qf name=config-api | head -n1) contrail-status
 ```
+
+> [!NOTE]
+> Không dùng `-it` cho lệnh kiểm tra one-shot này — `-it` cấp phát pseudo-TTY, chỉ cần thiết khi attach vào shell tương tác; chạy qua SSH không tương tác (như ở mục Kiểm tra kết quả cuối bài) mà vẫn giữ `-it` thường lỗi kiểu "the input device is not a TTY". `| head -n1` phòng trường hợp filter theo tên khớp nhiều hơn 1 container.
 
 Kết quả mong đợi: toàn bộ service liệt kê ở trạng thái `active`, không có dòng `initializing`/`failed` kéo dài quá vài phút.
 
@@ -244,6 +264,9 @@ TF Config API (port `8082`/`8143`) ở chế độ `no-auth` mặc định trên
 
 > [!TODO]
 > Xác nhận cơ chế AAA hiện có của version TF đang triển khai (`AAA_MODE`, hỗ trợ local RBAC hay chỉ Keystone) tại tài liệu chính thức — nếu bản đang dùng hỗ trợ RBAC cục bộ, bật thay vì chỉ dựa vào firewall.
+
+> [!TODO]
+> Số port bên dưới (`8082` Config API, `8143`/`8080` WebUI, `9041`) là số port phổ biến qua các bản Contrail/TF cũ hơn nhưng **chưa được xác minh lại cho đúng version đang triển khai** — có khả năng `8143` thực chất là WebUI HTTPS chứ không phải Config API HTTPS (Config API nhiều bản chỉ chạy HTTP thuần trên `8082`, không có cổng HTTPS riêng). Đối chiếu lại đúng port trong `contrail-status`/tài liệu chính thức trước khi áp dụng rule production — mở nhầm cổng nghĩa là hoặc chặn nhầm chức năng cần, hoặc mở lộ chức năng không nên mở.
 
 - Trong lúc chưa xác nhận được cơ chế AAA phù hợp, giới hạn chặt bằng firewall: Config API và Analytics API chỉ được reach từ chính các controller node và từ VIP Management Server (đã dựng ở [[CloudStack Control Plane - Triển khai Management Server HA và Galera Database]]) — không mở cho toàn bộ Management network:
 
@@ -274,7 +297,7 @@ Chạy lệnh trên từ một máy **ngoài** danh sách được allow ở fir
 ```bash
 for h in tf-controller01 tf-controller02 tf-controller03; do
   echo "== $h =="
-  ssh -i ~/.ssh/tf-deployer-key root@$h "sudo docker exec -it \$(sudo docker ps -qf name=config-api) contrail-status"
+  ssh -i ~/.ssh/tf-deployer-key root@$h "sudo docker exec \$(sudo docker ps -qf name=config-api | head -n1) contrail-status"
 done
 ```
 
@@ -283,7 +306,7 @@ done
 ```bash
 for h in cloudstack-kvm01 cloudstack-kvm02 cloudstack-kvm03; do
   echo "== $h =="
-  ssh -i ~/.ssh/tf-deployer-key root@$h "sudo docker exec -it \$(sudo docker ps -qf name=vrouter-agent) contrail-status"
+  ssh -i ~/.ssh/tf-deployer-key root@$h "sudo docker exec \$(sudo docker ps -qf name=vrouter-agent | head -n1) contrail-status"
 done
 ```
 
@@ -299,6 +322,9 @@ done
 Không áp dụng - lab dựng mới theo hướng dẫn triển khai chuẩn, chưa có log lỗi thực tế phát sinh trong quá trình build để ghi nhận.
 
 ## Rollback
+
+> [!TODO]
+> Tên playbook uninstall bên dưới (`uninstall_vrouter.yml`, `uninstall_contrail.yml`) viết theo quy ước đặt tên của `ansible-deployer`, **chưa xác minh lại có tồn tại đúng tên này trong repo/version đang dùng** — cùng mức độ chưa chắc chắn như đã nêu ở Bước 3. Đối chiếu `ls playbooks/` trong repo đã clone trước khi chạy, một số version chỉ có 1 playbook cleanup chung thay vì tách riêng theo role.
 
 - Gỡ vRouter khỏi từng KVM host trước (trả interface Guest overlay về trạng thái ban đầu):
 

@@ -1,6 +1,6 @@
 # IAM — Authorization (AuthZ)
 Tier: 2
-Parent: [[Kubernetes/Security/iam/iam]]
+Parent: [[Tech/iam/iam]]
 Related: [[iam--authentication]], [[iam--pam-privileged-access]]
 Tags: #iam #authorization #security
 

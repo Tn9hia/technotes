@@ -1,6 +1,6 @@
 # IAM — Multi-Factor Authentication (MFA)
 Tier: 2
-Parent: [[Kubernetes/Security/iam/iam]]
+Parent: [[Tech/iam/iam]]
 Related: [[iam--authentication]], [[iam--sso]]
 Tags: #iam #mfa #authentication #security
 

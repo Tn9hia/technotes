@@ -1,6 +1,6 @@
 # IAM — SAML 2.0
 Tier: 2
-Parent: [[Kubernetes/Security/iam/iam]]
+Parent: [[Tech/iam/iam]]
 Related: [[iam--sso]], [[iam--oidc]]
 Tags: #iam #saml #federation #security
 

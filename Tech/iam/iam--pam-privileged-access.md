@@ -1,6 +1,6 @@
 # IAM — Privileged Access Management (PAM)
 Tier: 2
-Parent: [[Kubernetes/Security/iam/iam]]
+Parent: [[Tech/iam/iam]]
 Related: [[iam--authorization]], [[iam--mfa]], [[iam--directory-ldap-ad]]
 Tags: #iam #pam #security #privileged-access
 

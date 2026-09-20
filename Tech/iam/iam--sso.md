@@ -1,6 +1,6 @@
 # IAM — Single Sign-On (SSO)
 Tier: 2
-Parent: [[Kubernetes/Security/iam/iam]]
+Parent: [[Tech/iam/iam]]
 Related: [[iam--saml]], [[iam--oidc]], [[iam--session-token-management]], [[iam--authentication]]
 Tags: #iam #sso #federation
 

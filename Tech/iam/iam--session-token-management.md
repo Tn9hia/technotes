@@ -1,6 +1,6 @@
 # IAM — Session & Token Management
 Tier: 2
-Parent: [[Kubernetes/Security/iam/iam]]
+Parent: [[Tech/iam/iam]]
 Related: [[iam--jwt]], [[iam--oauth2]], [[iam--sso]], [[iam--authentication]]
 Tags: #iam #session #token #security
 

@@ -1,6 +1,6 @@
 # IAM — SCIM (Provisioning)
 Tier: 2
-Parent: [[Kubernetes/Security/iam/iam]]
+Parent: [[Tech/iam/iam]]
 Related: [[iam--directory-ldap-ad]], [[iam--sso]], [[iam--authorization]]
 Tags: #iam #scim #provisioning
 

@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:docs.goauthentik.io)",
+      "Read(//Users/nghia/Downloads/**)",
+      "Bash(python3 -c \"import openpyxl\")",
+      "Bash(python3 -c \"import pandas\")",
+      "Bash(python3)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(gh api *)",
+      "WebFetch(domain:api.github.com)"
+    ]
+  }
+}

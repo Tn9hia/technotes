@@ -109,7 +109,7 @@ Kết quả mong đợi: zone xuất hiện, `networktype=Advanced`, `allocation
 
 ### Bước 3 - Tạo Physical Network và gán Tungsten Fabric
 
-- Tạo Physical Network cho Zone, gán traffic label khớp với interface đã cấu hình ở [[CloudStack Compute Node - Chuẩn bị KVM Hypervisor Host]]:
+- Tạo Physical Network cho Zone:
 
 ```bash
 cmk create physicalnetwork \
@@ -119,6 +119,27 @@ cmk create physicalnetwork \
 
 > [!TODO]
 > Giá trị `isolationmethods` cho Physical Network dùng Tungsten Fabric cần xác nhận lại đúng theo tài liệu plugin của version CloudStack đang cài (một số bản dùng cờ riêng khi enable TF provider thay vì khai `isolationmethods` như VLAN/VXLAN thông thường) — không đoán giá trị này, tra cứu `docs.cloudstack.apache.org` mục Tungsten-Fabric plugin đúng version trước khi áp dụng production.
+
+- Gán traffic label khớp với interface/bridge đã cấu hình ở [[CloudStack Compute Node - Chuẩn bị KVM Hypervisor Host]] cho từng traffic type trên Physical Network vừa tạo — bước này hay bị bỏ sót vì `create physicalnetwork` ở trên **không** tự gán label, thiếu bước này thì host add vào sau sẽ không biết bridge nào phục vụ traffic nào:
+
+```bash
+cmk add traffictype physicalnetworkid=<physical-network-id> traffictype=Management kvmnetworklabel=<bridge-management>
+cmk add traffictype physicalnetworkid=<physical-network-id> traffictype=Public kvmnetworklabel=<bridge-public>
+cmk add traffictype physicalnetworkid=<physical-network-id> traffictype=Guest kvmnetworklabel=<bridge-guest>
+```
+
+> [!NOTE]
+> Nếu Management/Public/Guest đều gộp chung 1 NIC/bridge như ghi ở Planning table (`cloudbr0`), cả 3 lệnh trên dùng cùng 1 giá trị `kvmnetworklabel` — vẫn phải khai đủ 3 traffic type, CloudStack không tự suy ra traffic type còn thiếu.
+
+- Riêng traffic type `Guest` cần đăng ký thêm Tungsten Fabric làm Network Service Provider **trên đúng Physical Network này** (khác với việc đăng ký kết nối TF Config API ở Bước 2, vốn chỉ khai báo cụm TF tồn tại ở mức Zone) — CloudStack không cho `update physicalnetwork state=Enabled` thành công nếu các service provider bắt buộc chưa được cấu hình trên physical network:
+
+```bash
+cmk list networkserviceproviders physicalnetworkid=<physical-network-id>
+cmk update networkserviceprovider id=<tungsten-fabric-provider-id-trên-physical-network-này> state=Enabled
+```
+
+> [!TODO]
+> Tên chính xác của service provider TF trong `listNetworkServiceProviders` (`TungstenFabric`? `Tungsten-Fabric`?) và việc nó có tự xuất hiện sau khi đăng ký ở Bước 2 hay cần `cmk add networkserviceprovider` thủ công — cần đối chiếu UI **Infrastructure → Zones → \<zone\> → Physical Network → Network Service Providers** thực tế trên version đang cài, vì đây là phần khác biệt nhiều nhất giữa các plugin SDN (NSX/Nuage/TF) qua từng bản CloudStack.
 
 - Bật Physical Network sau khi cấu hình xong:
 
@@ -216,10 +237,15 @@ Kết quả mong đợi: Primary Storage `state=Up`, Secondary Storage (NFS) xu�
 ```bash
 cmk create vlaniprange \
   zoneid=<zone-id> \
+  physicalnetworkid=<physical-network-id> \
   forvirtualnetwork=true \
+  vlan=untagged \
   gateway=<public-gateway> netmask=<public-netmask> \
   startip=<public-start-ip> endip=<public-end-ip>
 ```
+
+> [!TODO]
+> `physicalnetworkid` và `vlan` thêm vào đây vì lab này chỉ có 1 Physical Network dùng chung 1 bridge cho Management/Public/Guest (không tách VLAN riêng cho Public) — `vlan=untagged` giả định đúng trường hợp đó. Nếu Public network của bạn có VLAN tag riêng trên switch vật lý, đổi `vlan=untagged` thành đúng VLAN ID và xác nhận lại `physicalnetworkid` có bắt buộc hay CloudStack tự suy ra khi Zone chỉ có 1 physical network — hành vi này có thể khác giữa các minor version.
 
 - Kiểm tra kết quả bước này:
 
@@ -240,6 +266,9 @@ cmk create networkoffering \
   supportedservices=Dhcp,Dns,SourceNat,StaticNat,Firewall,PortForwarding,Lb \
   serviceproviderlist=Dhcp:TungstenFabric,Dns:TungstenFabric,SourceNat:TungstenFabric,StaticNat:TungstenFabric,Firewall:TungstenFabric,PortForwarding:TungstenFabric,Lb:TungstenFabric
 ```
+
+> [!TODO]
+> Chuỗi `TungstenFabric` trong `serviceproviderlist` là tên suy đoán theo quy ước đặt tên provider của CloudStack (giống `VirtualRouter`, `Netscaler`...) — **chưa xác minh lại đúng chuỗi này với version đang cài**. Lấy tên chính xác từ kết quả `cmk list networkserviceproviders physicalnetworkid=<physical-network-id>` ở Bước 3 rồi mới điền vào đây, sai tên provider khiến lệnh `create networkoffering` fail hoặc tạo ra offering không gắn được với TF.
 
 > [!NOTE]
 > `serviceproviderlist` liệt kê Tungsten Fabric thay vì `VirtualRouter` cho từng service — đây là điểm khác biệt cốt lõi so với Zone dùng VR truyền thống: routing/NAT/firewall của Guest network giờ do TF xử lý qua overlay, không sinh VM Virtual Router riêng cho từng network nữa.
