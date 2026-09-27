@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(xargs -I{} basename {})",
-      "Bash(awk -F: '{sum+=$2} END {print \"Total lines:\", sum}')"
+      "Bash(awk -F: '{sum+=$2} END {print \"Total lines:\", sum}')",
+      "Bash(grep -rli \"tungsten\" .)",
+      "Bash(grep -rl \"cloudstack-ms0\\\\|cloudstack-db0\\\\|cloudstack-kvm0\" .)",
+      "Bash(git -C \"/Users/nghia/Library/CloudStorage/GoogleDrive-t.nghia2605@gmail.com/Other computers/My MacBook Air/GoogleDrive/my-note/Cloud\" mv \"Cloudstack/lab/CloudStack Native VXLAN - Triển khai Guest Network Isolation.md\" \"Cloudstack/lab/CloudStack VXLAN EVPN - Triển khai Guest Network Isolation với FRRouting.md\")",
+      "WebFetch(domain:docs.cloudstack.apache.org)"
     ]
   }
 }

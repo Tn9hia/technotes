@@ -74,11 +74,11 @@ sequenceDiagram
 
 **System > Certificates > Generate** (không dùng chung với cert web TLS mặc định của authentik):
 
-| Field | Value |
-|---|---|
-| Common Name | `saml-signing.auth-02.lab.internal` |
+| Field            | Value                                  |
+| ---------------- | -------------------------------------- |
+| Common Name      | `saml-signing.auth-02.lab.internal`    |
 | Subject Alt Name | *(để trống, hoặc thêm nếu SP yêu cầu)* |
-| Validity | Theo policy nội bộ (vd 2 năm) |
+| Validity         | Theo policy nội bộ (vd 2 năm)          |
 
 Lưu lại — sẽ chọn cert này làm **Signing Certificate** khi tạo Provider ở §4.
 
@@ -110,24 +110,24 @@ Flows and Stages > Flows > `default-authentication-flow` > tab **Stage Bindings*
 
 ### 4.1 New application
 
-| Field | Value |
-|---|---|
-| Name | `Horizon UAG` |
-| Slug | `horizon-uag` |
+| Field | Value         |
+| ----- | ------------- |
+| Name  | `Horizon UAG` |
+| Slug  | `horizon-uag` |
 
 ### 4.2 Provider Type → **SAML Provider**
 
 ### 4.3 Configure SAML Provider
 
-| Field | Value | Ghi chú |
-|---|---|---|
-| Authorization flow | `default-provider-authorization-implicit-consent` | Mặc định |
-| **ACS URL** | *(placeholder tạm)* `https://uag-02.lab.internal/PLACEHOLDER` | ⚠️ Giá trị thật chưa biết — UAG chỉ sinh ra SP metadata **sau khi** đã nhận IdP metadata của authentik (giống hệt cách ADFS-UAG từng làm, xem bước 4-5 sheet `TrueSSO-Release`). Sẽ sửa lại chính xác ở §5.3 bằng cách import SP metadata thật từ UAG |
-| Issuer / Audience | `https://uag-02.lab.internal` | Sẽ được ghi đè khi import SP metadata ở §5.3 nếu khác |
-| Service Provider Binding | `Post` | Chuẩn phổ biến nhất cho ACS, sẽ confirm lại theo SP metadata thật |
-| Signing Certificate | `saml-signing.auth-02.lab.internal` (đã tạo ở §3.2) | |
-| NameID Property Mapping | `authentik default SAML Mapping: UPN` | Tương đương Rule 1 của ADFS cũ (Incoming UPN → outgoing Name ID, passthrough) |
-| Property mappings | Chọn ít nhất `authentik default SAML Mapping: UPN` | Tương đương Rule 2 của ADFS cũ (LDAP User-Principal-Name → claim `UPN`). Có thể chọn thêm Email/Username nếu muốn, không bắt buộc cho True SSO |
+| Field                    | Value                                                         | Ghi chú                                                                                                                                                                                                                                               |
+| ------------------------ | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Authorization flow       | `default-provider-authorization-implicit-consent`             | Mặc định                                                                                                                                                                                                                                              |
+| **ACS URL**              | *(placeholder tạm)* `https://uag-02.lab.internal/PLACEHOLDER` | ⚠️ Giá trị thật chưa biết — UAG chỉ sinh ra SP metadata **sau khi** đã nhận IdP metadata của authentik (giống hệt cách ADFS-UAG từng làm, xem bước 4-5 sheet `TrueSSO-Release`). Sẽ sửa lại chính xác ở §5.3 bằng cách import SP metadata thật từ UAG |
+| Issuer / Audience        | `https://uag-02.lab.internal`                                 | Sẽ được ghi đè khi import SP metadata ở §5.3 nếu khác                                                                                                                                                                                                 |
+| Service Provider Binding | `Post`                                                        | Chuẩn phổ biến nhất cho ACS, sẽ confirm lại theo SP metadata thật                                                                                                                                                                                     |
+| Signing Certificate      | `saml-signing.auth-02.lab.internal` (đã tạo ở §3.2)           |                                                                                                                                                                                                                                                       |
+| NameID Property Mapping  | `authentik default SAML Mapping: UPN`                         | Tương đương Rule 1 của ADFS cũ (Incoming UPN → outgoing Name ID, passthrough)                                                                                                                                                                         |
+| Property mappings        | Chọn ít nhất `authentik default SAML Mapping: UPN`            | Tương đương Rule 2 của ADFS cũ (LDAP User-Principal-Name → claim `UPN`). Có thể chọn thêm Email/Username nếu muốn, không bắt buộc cho True SSO                                                                                                        |
 
 Click **Submit/Finish**. Provider + Application được tạo — **lấy metadata ngay để dùng ở bước tiếp theo**:
 

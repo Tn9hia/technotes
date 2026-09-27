@@ -8,16 +8,19 @@ tags:
 
 # CloudStack Template - Import Guest OS Template và Deploy VM đầu tiên
 
-- **Bối cảnh và vấn đề**: Zone đã `Enabled` ở [[CloudStack Advanced Zone - Triển khai Network SDN và Storage]] nhưng chưa có OS template nào để deploy VM, cũng chưa có Service/Disk Offering cho user chọn. Đây là bước cuối cùng chứng minh toàn bộ chuỗi hạ tầng (control plane, storage, compute, SDN) hoạt động đúng end-to-end trước khi bàn giao Zone cho user thật.
-- **Cách giải quyết**: Import Ubuntu 24.04 cloud image làm Guest OS Template qua Secondary Storage, tạo Compute Offering + Disk Offering cơ bản, tạo Isolated Network dùng Network Offering Tungsten Fabric đã tạo ở lab trước, deploy 1 VM test bằng SSH keypair injection qua cloud-init, cấu hình Static NAT/Firewall để SSH được từ ngoài vào.
-- **Kết quả sau khi hoàn thành**: VM chạy thành công trên Ceph RBD, có network do Tungsten Fabric quản lý, SSH được từ ngoài Zone. Series [[CloudStack Production Cluster - Lab Series Overview]] hoàn tất — cụm CloudStack sẵn sàng bàn giao vận hành.
+- **Bối cảnh và vấn đề**: Zone đã `Enabled` ở [[CloudStack Advanced Zone - Triển khai Network SDN và Storage]] nhưng chưa có OS template nào để deploy VM, cũng chưa có Service/Disk Offering cho user chọn. Đây là bước cuối cùng chứng minh toàn bộ chuỗi hạ tầng (control plane, storage, compute, VXLAN/EVPN) hoạt động đúng end-to-end trước khi bàn giao Zone cho user thật.
+- **Cách giải quyết**: Import Ubuntu 24.04 cloud image làm Guest OS Template qua Secondary Storage, tạo Compute Offering + Disk Offering cơ bản, tạo Isolated Network dùng Network Offering đã tạo ở lab trước, deploy 1 VM test bằng SSH keypair injection qua cloud-init, cấu hình Static NAT/Firewall để SSH được từ ngoài vào.
+- **Kết quả sau khi hoàn thành**: VM chạy thành công trên Ceph RBD, có network cô lập bằng VLAN ở tầng CloudStack và mở rộng qua EVPN VXLAN ở tầng hạ tầng, SSH được từ ngoài Zone. Series [[CloudStack Production Cluster - Lab Series Overview]] hoàn tất — cụm CloudStack sẵn sàng bàn giao vận hành.
+
+> [!NOTE]
+> Vì Guest network dùng Virtual Router chuẩn của CloudStack (CloudStack chỉ thấy VLAN, không biết gì về lớp EVPN VXLAN bên dưới), password reset qua Console và metadata service (`169.254.169.254`) hoạt động theo đúng hành vi mặc định đã được tài liệu hoá đầy đủ. Lab này vẫn ưu tiên SSH-key injection qua `cloud-init` làm phương thức truy cập chính vì đây là thực hành chuẩn cho production, không phải vì cơ chế password reset chưa chắc hoạt động.
 
 > [!NOTE]
 > Lab này dùng Ubuntu 24.04 cloud image làm ví dụ vì có sẵn `cloud-init`, hỗ trợ SSH-key injection ngay từ lần boot đầu — không cần đặt password mặc định trong template. Quy trình tương tự áp dụng cho bất kỳ distro nào khác hỗ trợ `cloud-init`/`cloudbase-init`.
 
 ## Prerequisites
 
-- **Hạ tầng**: [[CloudStack Advanced Zone - Triển khai Network SDN và Storage]] đã hoàn tất — Zone `Enabled`, SSVM/CPVM `Running`, Network Offering Tungsten Fabric đã `Enabled`.
+- **Hạ tầng**: [[CloudStack Advanced Zone - Triển khai Network SDN và Storage]] đã hoàn tất — Zone `Enabled`, SSVM/CPVM `Running`, Network Offering đã `Enabled`.
 - **Máy chủ / VM**: không thêm node mới ở lab này.
 - **Tài khoản và quyền**: tài khoản `admin` hoặc account có quyền `registerTemplate`/`deployVirtualMachine`.
 - **Mạng**: 1 Public IP còn trống trong dải đã khai báo ở lab trước, dùng cho Static NAT tới VM test.
@@ -31,7 +34,7 @@ tags:
 | Template URL | `https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-server-cloudimg-amd64.img` | Xác nhận lại URL/checksum mới nhất trước khi import |
 | Compute Offering | `<TBD>` | Ví dụ: 2 vCPU / 4GB RAM |
 | Disk Offering | `<TBD>` | Ví dụ: 20GB, dùng chung QoS pool `cloudstack-primary` |
-| Isolated Network name | `<TBD>` | Dùng Network Offering Tungsten Fabric đã tạo ở lab trước |
+| Isolated Network name | `<TBD>` | Dùng Network Offering đã tạo ở lab trước |
 | SSH keypair name | `<TBD>` | Đăng ký qua `registerSSHKeyPair` hoặc `createSSHKeyPair` |
 | Public IP dùng Static NAT | `<TBD - 1 IP trong dải Public IP range>` | |
 | VM test name | `vm-test-01` | Xoá sau khi hoàn tất kiểm tra nếu chỉ dùng để test |
@@ -45,7 +48,7 @@ flowchart TD
     Admin -- "3. createNetwork (TF offering)" --> Net[Isolated Network]
     Admin -- "4. deployVirtualMachine" --> VM[vm-test-01]
     VM -- disk --> Ceph["Ceph RBD pool<br/>cloudstack-primary"]
-    Net -- overlay --> TF["Tungsten Fabric<br/>(lab trước)"]
+    Net -- "VXLAN (EVPN mode)" --> VR["Virtual Router chuẩn<br/>(DHCP/DNS/SNAT)"]
     Admin -- "5. enableStaticNat" --> PubIP[Public IP]
     User[External User] -- "6. SSH qua Public IP" --> PubIP --> VM
 ```
@@ -73,15 +76,12 @@ cmk register template \
   hypervisor=KVM \
   format=QCOW2 \
   ostypeid=<ostype-id> \
-  passwordenabled=false \
+  passwordenabled=true \
   ispublic=true
 ```
 
 > [!NOTE]
-> `passwordenabled=false` — cơ chế "reset password qua Console" mặc định của CloudStack dựa vào Password Server chạy trên Virtual Router; Zone này dùng Tungsten Fabric thay VR cho DHCP/metadata nên **chưa xác nhận** cơ chế reset password tương đương đã hoạt động đúng.
->
-> [!TODO]
-> Kiểm chứng thực tế metadata service (`169.254.169.254`) có được Tungsten Fabric phục vụ đầy đủ như VR hay không trước khi bật `passwordenabled=true` cho production. Trong lúc chưa xác nhận, lab này dùng SSH-key injection qua `cloud-init` làm phương thức truy cập chính — cùng cơ chế metadata nhưng là luồng đã được TF hỗ trợ phổ biến hơn trong thực tế triển khai.
+> `passwordenabled=true` — cơ chế "reset password qua Console" của CloudStack dựa vào Password Server chạy trên Virtual Router chuẩn, hoạt động bình thường vì Zone này dùng VR mặc định cho DHCP/metadata. Lab vẫn ưu tiên SSH-key injection qua `cloud-init` ở Bước 4-5 làm phương thức truy cập chính cho VM test, đúng thực hành chuẩn production — password reset qua Console chỉ là phương án dự phòng khi cần truy cập console trực tiếp.
 
 - Kiểm tra kết quả bước này:
 
@@ -120,7 +120,7 @@ cmk list serviceofferings name=<compute-offering-name>
 cmk list diskofferings name=<disk-offering-name>
 ```
 
-### Bước 3 - Tạo Isolated Network dùng Tungsten Fabric
+### Bước 3 - Tạo Isolated Network
 
 ```bash
 cmk create network \
@@ -136,7 +136,7 @@ cmk create network \
 cmk list networks name=<isolated-network-name>
 ```
 
-Kết quả mong đợi: `state=Allocated`, `networkofferingid` đúng offering Tungsten Fabric đã tạo.
+Kết quả mong đợi: `state=Allocated`, `networkofferingid` đúng offering đã tạo ở lab Advanced Zone.
 
 ### Bước 4 - Đăng ký SSH keypair
 
@@ -201,7 +201,7 @@ cmk create firewallrule \
 ssh -i ~/.ssh/<ssh-keypair-name> ubuntu@<public-ip>
 ```
 
-Kết quả mong đợi: SSH thành công bằng key, không cần password — xác nhận cloud-init đã inject key đúng, và toàn bộ luồng Public IP → Static NAT → Tungsten Fabric overlay → vRouter → VM hoạt động.
+Kết quả mong đợi: SSH thành công bằng key, không cần password — xác nhận cloud-init đã inject key đúng, và toàn bộ luồng Public IP → Static NAT → Virtual Router → VXLAN (EVPN) → VM hoạt động.
 
 ### Khai báo thông tin nhạy cảm
 
@@ -215,7 +215,7 @@ Kết quả mong đợi: SSH thành công bằng key, không cần password — 
   | VM chạy | `cmk list virtualmachines name=<vm-test-name>` | `state=Running` |
   | Disk nằm trên Ceph RBD | `rbd -p cloudstack-primary --id cloudstack-rbd ls` (chạy trên Ceph admin node) | Thấy volume tương ứng VM vừa tạo |
   | SSH từ ngoài vào VM | `ssh -i <key> ubuntu@<public-ip>` | Đăng nhập thành công bằng key, không cần password |
-  | VM có internet ra ngoài | Từ trong VM: `curl -I https://download.cloudstack.org` | Nhận HTTP response, xác nhận SNAT qua Tungsten Fabric hoạt động |
+  | VM có internet ra ngoài | Từ trong VM: `curl -I https://download.cloudstack.org` | Nhận HTTP response, xác nhận SNAT qua Virtual Router hoạt động |
 
 - Sau khi xác nhận đủ 5 hạng mục trên, Zone chính thức sẵn sàng bàn giao. Xoá VM test nếu chỉ dùng để kiểm tra:
 

@@ -5,7 +5,10 @@
 - **Kết quả sau khi hoàn thành**: CloudStack có một Primary Storage Pool chạy trên RBD và một Secondary Storage Pool chạy trên NFS, cùng share hạ tầng vật lý của một cụm Ceph 7 node. Admin thao tác OSD/pool qua `ceph orch`, không cần quản lý daemon thủ công.
 
 > [!NOTE]
-> Lab này là một phần của series dựng cụm CloudStack production hoàn chỉnh — xem [[CloudStack Production Cluster - Lab Series Overview]] để biết thứ tự triển khai đầy đủ cùng các lab Control Plane, Compute Node, Tungsten Fabric SDN, Advanced Zone.
+> Lab này là một phần của series dựng cụm CloudStack production hoàn chỉnh — xem [[CloudStack Production Cluster - Lab Series Overview]] để biết thứ tự triển khai đầy đủ cùng các lab Control Plane, Compute Node, VXLAN EVPN, Advanced Zone.
+
+> [!NOTE]
+> Ceph Dashboard trong lab này không expose trực tiếp ra Mgt/Public network — truy cập qua VIP dùng chung ở [[CloudStack & Ceph - Shared Load Balancer HAProxy Keepalived]] (cùng VIP với CloudStack UI/API và Galera, phân biệt bằng port). Firewall ở Bước 5 chỉ mở port Dashboard cho 2 node `cs-lb-01/02`, không mở cho toàn bộ Mgt/Public network.
 
 > [!NOTE]
 > Lab này tách riêng node chạy daemon điều phối cụm (mon/mgr/mds/nfs) khỏi node chạy OSD ngay từ đầu, thay vì kiến trúc converged (mọi daemon dùng chung node) như ở cụm 3-node. Vì đã có đủ 7 node, việc tách này tránh cho control-plane bị cạnh tranh CPU/RAM với tải I/O của OSD lúc rebalance/scrub, đồng thời giúp scale storage (thêm node ceph-0N chỉ chạy osd) độc lập với scale control-plane.
@@ -26,7 +29,10 @@
   | ceph-07 | storage node (osd) | 4 vCPU - 8 GB - (OS 50GB, data 200GB x3) |
 
 - **Tài khoản và quyền**: user sudo trên cả 7 node để cài đặt và cho `cephadm` SSH vào orchestrate.
-- **Mạng**: tách 2 dải mạng riêng biệt — mgt/user access network (SSH, cephadm orchestration, Dashboard, client RBD/NFS) và storage network (OSD replication/heartbeat). Storage network cần switch hỗ trợ Jumbo Frame, bật MTU 9000 để giảm CPU overhead và tránh phân mảnh gói tin khi replicate dữ liệu giữa các OSD. Chỉ 4 node storage (ceph-04..07) cần có interface trên storage network; 3 node control-plane/gateway chỉ cần mgt/user access network.
+- **Mạng**: tách 2 dải mạng riêng biệt — mgt/user access network (SSH, cephadm orchestration, Dashboard, client RBD/NFS) và storage network (OSD replication/heartbeat, nội bộ giữa các node Ceph). Storage network (OSD) cần switch hỗ trợ Jumbo Frame, bật MTU 9000 để giảm CPU overhead và tránh phân mảnh gói tin khi replicate dữ liệu giữa các OSD. Chỉ 4 node storage (ceph-04..07) cần có interface trên storage network (OSD); 3 node control-plane/gateway chỉ cần mgt/user access network.
+
+> [!NOTE]
+> "Mgt/Public network" của Ceph ở đây chính là network mà **NIC Storage** trên các `cs-compute-0x` (xem [[CloudStack Compute Node - Chuẩn bị KVM Hypervisor Host]]) cần reach tới — client RBD (`librbd`)/NFS của CloudStack đi qua NIC Storage riêng của compute node, tách khỏi Management network của CloudStack, không đi chung đường với SSH/Agent/API. Không nhầm lẫn 2 khái niệm "storage network" khác nhau trong 2 lab: ở đây là network nội bộ giữa các node Ceph (OSD replication), còn NIC Storage của compute node là network Ceph **client-facing** (Mgt/Public network Ceph).
 - **NTP**: cần có NTP source nội bộ để đồng bộ thời gian giữa các node — cephx dùng timestamp chống replay attack, lệch giờ sẽ khiến node bị đá khỏi quorum (xem Bước 1).
 - **Kiến thức nền**: runbook này giả định người đọc đã biết Linux administration cơ bản, khái niệm TCP/IP, khái niệm Ceph (OSD/MON/MGR/PG/CRUSH) và khái niệm Zone/Pod/Cluster/Primary-Secondary Storage trong CloudStack — không giải thích lại từ đầu.
 
@@ -46,7 +52,7 @@
 | ceph-05 hostname/IP | `<ip-node05>` | osd, cluster-network IP `<cluster-ip-node05>` |
 | ceph-06 hostname/IP | `<ip-node06>` | osd, cluster-network IP `<cluster-ip-node06>` |
 | ceph-07 hostname/IP | `<ip-node07>` | osd, cluster-network IP `<cluster-ip-node07>` |
-| Mgt/Public network CIDR | `<mgt-network-cidr>` | SSH, cephadm orchestration, Dashboard HTTPS, client RBD/NFS |
+| Mgt/Public network CIDR | `<mgt-network-cidr>` | SSH, cephadm orchestration, Dashboard HTTPS, client RBD/NFS — cùng dải với NIC Storage của `cs-compute-0x` |
 | Cluster/Storage network CIDR | `<cluster-network-cidr>` | Riêng biệt, không route ra ngoài — OSD replication/heartbeat, chỉ cấu hình trên ceph-04..07 |
 | MTU Cluster network | `9000` | Jumbo frame, giảm CPU overhead khi replicate giữa các OSD |
 | NTP server | `172.29.70.254` | Nguồn đồng bộ thời gian nội bộ, có thể thêm pool dự phòng nếu tổ chức có |
@@ -57,17 +63,18 @@
 | Pool Primary Storage | `cloudstack-primary` | replicated x3, min_size 2 |
 | CephFS volume Secondary Storage | `cloudstack-secondary` | data + metadata pool, replicated x3 |
 | NFS export path | `/cloudstack-secondary` | pseudo path export cho CloudStack Secondary Storage VM (SSVM) |
-| Secondary Storage client CIDR | `<secondary-storage-client-cidr>` | Dải IP của SSVM + KVM host, dùng để giới hạn NFS export |
+| Secondary Storage client CIDR | `<secondary-storage-client-cidr>` | Dải IP của SSVM + NIC Storage của `cs-compute-0x`, dùng để giới hạn NFS export |
 | Dashboard admin user | `<dashboard-admin-user>` | Role `administrator`, không dùng chung tài khoản `admin` mặc định |
+| cs-lb-01/02 hostname/IP | Tham chiếu [[CloudStack & Ceph - Shared Load Balancer HAProxy Keepalived]] | Duy nhất 2 IP được phép reach port `8443` (Dashboard) trên `ceph-01/02/03`, xem Bước 5 |
 | SSH orchestration user | `ceph-adm` | User riêng cho `cephadm` SSH, không dùng `root` |
 
 ## Diagram
 
 ```mermaid
 flowchart TD
-    MGMT[CloudStack Management Server] -- "RBD + cephx" --> PUB["Mgt/Public Network<br/>&lt;mgt-network-cidr&gt;"]
-    KVM[KVM Hypervisor Hosts] -- "librbd" --> PUB
+    KVM["cs-compute-01/02/03<br/>NIC Storage"] -- "librbd + cephx" --> PUB["Ceph Mgt/Public Network<br/>&lt;mgt-network-cidr&gt;"]
     SSVM[Secondary Storage VM] -- "NFSv4.1" --> VIP["NFS Ingress VIP<br/>&lt;nfs-vip&gt;"]
+    LB["cs-lb-01/02<br/>(Shared Load Balancer)"] -- "8443 → Dashboard" --> PUB
 
     PUB --> N1["ceph-01<br/>mon+mgr+mds+nfs<br/>label _admin"]
     PUB --> N2[ceph-02<br/>mon+mgr+mds+nfs]
@@ -428,7 +435,7 @@ sudo ceph config set mon mon_allow_pool_delete false
 ```bash
 sudo ufw allow from <mgt-network-cidr> to any port 3300,6789 proto tcp comment 'ceph mon'
 sudo ufw allow from <mgt-network-cidr> to any port 6800:7300 proto tcp comment 'ceph mgr/mds'
-sudo ufw allow from <mgt-network-cidr> to any port 8443 proto tcp comment 'ceph dashboard'
+sudo ufw allow from <ip-cs-lb-01>,<ip-cs-lb-02> to any port 8443 proto tcp comment 'ceph dashboard - chi tu shared lb'
 sudo ufw allow from <mgt-network-cidr> to any port 9283 proto tcp comment 'ceph prometheus exporter'
 ```
 
@@ -569,6 +576,9 @@ sudo umount /mnt
 Kết quả mong đợi: mount thành công, tạo/xoá file test không lỗi permission.
 
 ### Bước 8 - Bảo mật Ceph Dashboard
+
+> [!NOTE]
+> Cert TLS cài ở bước này phục vụ kết nối **HAProxy (cs-lb-01/02) → mgr** (backend, xem [[CloudStack & Ceph - Shared Load Balancer HAProxy Keepalived]] — cấu hình `check ssl verify none` ở backend nên cert nội bộ tự ký cũng chấp nhận được, nhưng vẫn nên dùng internal CA cho nhất quán). Người dùng cuối truy cập Dashboard qua VIP dùng chung (`https://<vip>:8443`), nơi TLS thật sự được terminate bằng cert riêng của VIP — không truy cập trực tiếp vào IP từng node `ceph-01/02/03` nữa sau khi lab LB hoàn tất.
 
 - Cài certificate TLS thật từ internal CA thay vì self-signed mặc định:
 
@@ -730,3 +740,4 @@ sudo cephadm rm-cluster --fsid <fsid> --force --zap-osds
 - [Apache CloudStack - KVM Hypervisor Host Installation](https://docs.cloudstack.apache.org/en/latest/installguide/hypervisor/kvm.html)
 - [Apache CloudStack - Add Primary Storage](https://docs.cloudstack.apache.org/en/latest/adminguide/storage.html)
 - [Apache CloudStack - Add Secondary Storage](https://docs.cloudstack.apache.org/en/latest/adminguide/storage.html)
+- Ghi chú liên quan trong vault: [[CloudStack Compute Node - Chuẩn bị KVM Hypervisor Host]] | [[CloudStack & Ceph - Shared Load Balancer HAProxy Keepalived]]
