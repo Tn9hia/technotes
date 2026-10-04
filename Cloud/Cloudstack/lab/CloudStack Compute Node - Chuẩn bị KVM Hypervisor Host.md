@@ -11,12 +11,12 @@ tags:
 - **Bối cảnh và vấn đề**: Khi "Add Host" trong CloudStack, Management Server SSH vào host và tự cài `cloudstack-agent`, nhưng chỉ khi host đã ở đúng trạng thái sẵn sàng: đã bật virtualization, đã cài `qemu-kvm`/`libvirt`, đã có bridge mạng đúng traffic label cho từng loại traffic, và firewall cho phép đúng luồng MS↔Agent, Host↔Host (live migration), Host↔Storage. Add Host vào một node chưa chuẩn bị đúng sẽ fail giữa chừng hoặc "thành công giả" (host lên Up nhưng VM không chạy được).
 - **Cách giải quyết**: Chuẩn hoá 3 node Ubuntu 24.04 (**cs-compute-01/02/03**) làm KVM Hypervisor Host, mỗi node dùng **4 NIC vật lý riêng biệt cho 4 traffic type** của CloudStack — đúng 1 NIC : 1 mục đích, không gộp chung như thiết kế cũ:
 
-  | NIC | Traffic type CloudStack | Cấu hình OS | Mục đích |
-  | --- | --- | --- | --- |
-  | NIC1 | Management | Bridge `cloudbr-mgmt` | SSH, Agent↔MS, live migration, VNC console |
-  | NIC2 | Storage | Interface trần, có IP, **không** bridge | Client RBD (Primary Storage) + NFS (mount khi cần) tới Ceph |
-  | NIC3 | Guest | Bridge `cloudbr-guest`, **có IPv4** (bắt buộc — dùng làm VTEP source) | Traffic label VXLAN của CloudStack — plugin VXLAN yêu cầu chính interface này có IP để terminate/originate VXLAN traffic (theo [Apache CloudStack - VXLAN Plugin](https://docs.cloudstack.apache.org/en/latest/plugins/vxlan.html)); CloudStack tự tạo VXLAN device + bridge phụ cho từng Guest network trên đây, học route qua BGP EVPN (FRRouting) thay vì multicast — xem [[CloudStack VXLAN EVPN - Triển khai Guest Network Isolation với FRRouting]] |
-  | NIC4 | Public | Bridge `cloudbr-public` | SNAT/Static NAT của Virtual Router, Public IP |
+| NIC | Traffic type CloudStack | Cấu hình OS | Mục đích |
+| --- | --- | --- | --- |
+| NIC1 | Management | Bridge `cloudbr-mgmt` | SSH, Agent↔MS, live migration, VNC console |
+| NIC2 | Storage | Interface trần, có IP, **không** bridge | Client RBD (Primary Storage) + NFS (mount khi cần) tới Ceph |
+| NIC3 | Guest | Bridge `cloudbr-guest`, **có IPv4** (bắt buộc — dùng làm VTEP source) | Traffic label VXLAN của CloudStack — plugin VXLAN yêu cầu chính interface này có IP để terminate/originate VXLAN traffic (theo [Apache CloudStack - VXLAN Plugin](https://docs.cloudstack.apache.org/en/latest/plugins/vxlan.html)); CloudStack tự tạo VXLAN device + bridge phụ cho từng Guest network trên đây, học route qua BGP EVPN (FRRouting) thay vì multicast — xem [[CloudStack VXLAN EVPN - Triển khai Guest Network Isolation với FRRouting]] |
+| NIC4 | Public | Bridge `cloudbr-public` | SNAT/Static NAT của Virtual Router, Public IP |
 
   Cài `qemu-kvm`/`libvirt`, hardening libvirt (chỉ nghe local socket, không mở TCP), giới hạn VNC console theo network, và cài sẵn client cho Ceph (RBD) + NFS trên NIC Storage.
 - **Kết quả sau khi hoàn thành**: 3 host ở trạng thái sẵn sàng để Management Server "Add Host" thành công ngay lần đầu ở lab tạo Zone/Cluster tiếp theo — không cần quay lại sửa OS giữa chừng.
@@ -32,9 +32,9 @@ tags:
 - **Hạ tầng**: [[CloudStack Control Plane - Triển khai Management Server HA và Galera Database]] đã hoàn tất (Management Server reachable qua VIP ở [[CloudStack & Ceph - Shared Load Balancer HAProxy Keepalived]]). Ceph cluster ở [[Ceph Cluster - Triển khai Primary và Secondary Storage cho CloudStack]] đã `HEALTH_OK`.
 - **Máy chủ / VM**: 3 host vật lý (không ảo hoá lồng nhau — cần hỗ trợ nested/hardware virtualization thật), mỗi host 4 NIC vật lý. Cấu hình ví dụ dùng trong lab:
 
-  | Node | CPU | RAM | Local disk | NIC |
-  | --- | --- | --- | --- | --- |
-  | cs-compute-01/02/03 | 32 vCPU (hỗ trợ VT-x/AMD-V) | 128 GB | 240 GB SSD (OS only, VM disk nằm trên Ceph RBD) | 4x NIC riêng: Management, Storage, Guest, Public |
+| Node | CPU | RAM | Local disk | NIC |
+| --- | --- | --- | --- | --- |
+| cs-compute-01/02/03 | 32 vCPU (hỗ trợ VT-x/AMD-V) | 128 GB | 240 GB SSD (OS only, VM disk nằm trên Ceph RBD) | 4x NIC riêng: Management, Storage, Guest, Public |
 
 - **Tài khoản và quyền**: sudo trên cả 3 host; SSH public key của Management Server (đã sinh ở lab Control Plane) cần được chấp nhận trên host để MS tự động cài agent.
 - **Mạng**: 4 dải mạng riêng biệt (Management, Storage, Guest, Public) đã xin từ team Network — placeholder ở Planning table. VNC console range cần biết dải IP System VM (Pod CIDR) để giới hạn firewall trên NIC Management.
@@ -321,16 +321,16 @@ Kết quả mong đợi: đầy đủ rule cho SSH, VNC, live migration, agent (
 
 - Toàn bộ 3 host đạt trạng thái sẵn sàng để Add Host thành công ở lab tiếp theo:
 
-  | Hạng mục cần kiểm tra | Cách kiểm tra | Kết quả đúng |
-  | --- | --- | --- |
-  | Hardware virtualization | `kvm-ok` | "KVM acceleration can be used" |
-  | libvirtd chạy, không mở TCP | `sudo ss -tlnp \| grep 1651` | Không có kết quả |
-  | Bridge Management | `ip -br addr show cloudbr-mgmt` | Có IP đúng |
-  | Bridge Public | `ip -br addr show cloudbr-public` | Có IP đúng |
-  | NIC Storage có IP, không bridge | `ip -br addr show <nic-storage>` | Có IP, không xuất hiện trong `brctl show`/`ip link` dạng bridge |
-  | Bridge Guest có IP (VTEP source) | `ip -br addr show cloudbr-guest` | Có IP đúng, chưa có VXLAN device nào (CloudStack tự tạo sau) |
-  | Reach Ceph qua NIC Storage | `rbd -p cloudstack-primary --id cloudstack-rbd ls -m <mon-ip>` | Không lỗi kết nối |
-  | SSH từ MS vào host qua NIC Management | `ssh root@<kvm-host> hostname` từ MS | Không hỏi password |
+| Hạng mục cần kiểm tra | Cách kiểm tra | Kết quả đúng |
+| --- | --- | --- |
+| Hardware virtualization | `kvm-ok` | "KVM acceleration can be used" |
+| libvirtd chạy, không mở TCP | `sudo ss -tlnp \| grep 1651` | Không có kết quả |
+| Bridge Management | `ip -br addr show cloudbr-mgmt` | Có IP đúng |
+| Bridge Public | `ip -br addr show cloudbr-public` | Có IP đúng |
+| NIC Storage có IP, không bridge | `ip -br addr show <nic-storage>` | Có IP, không xuất hiện trong `brctl show`/`ip link` dạng bridge |
+| Bridge Guest có IP (VTEP source) | `ip -br addr show cloudbr-guest` | Có IP đúng, chưa có VXLAN device nào (CloudStack tự tạo sau) |
+| Reach Ceph qua NIC Storage | `rbd -p cloudstack-primary --id cloudstack-rbd ls -m <mon-ip>` | Không lỗi kết nối |
+| SSH từ MS vào host qua NIC Management | `ssh root@<kvm-host> hostname` từ MS | Không hỏi password |
 
 ## Troubleshooting
 

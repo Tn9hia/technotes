@@ -41,10 +41,10 @@ tags:
 - **Hạ tầng**: [[CloudStack Compute Node - Chuẩn bị KVM Hypervisor Host]] đã hoàn tất — mỗi `cs-compute-0N` đã có bridge `cloudbr-guest` **có IPv4** (VTEP source).
 - **Máy chủ/VM**: 2 VM mới cho vai trò "ToR ảo":
 
-  | Node | Vai trò | CPU | RAM | Disk |
-  | --- | --- | --- | --- | --- |
-  | cs-tor-01 | FRR — eBGP route-relay (không phải VTEP, không có VNI cục bộ) | 2 vCPU | 4 GB | 20 GB |
-  | cs-tor-02 | FRR — eBGP route-relay | 2 vCPU | 4 GB | 20 GB |
+| Node | Vai trò | CPU | RAM | Disk |
+| --- | --- | --- | --- | --- |
+| cs-tor-01 | FRR — eBGP route-relay (không phải VTEP, không có VNI cục bộ) | 2 vCPU | 4 GB | 20 GB |
+| cs-tor-02 | FRR — eBGP route-relay | 2 vCPU | 4 GB | 20 GB |
 
 - **Tài khoản và quyền**: sudo trên `cs-tor-01/02` và cả 3 `cs-compute-0N`.
 - **Mạng**: `cs-tor-01/02` cần có NIC trên cùng L2 segment/VLAN với `cloudbr-guest` của các `cs-compute-0N` (đây là điều kiện để eBGP numbered thiết lập được — không cần route riêng, chỉ cần cùng subnet).
@@ -275,14 +275,14 @@ nc -zv <ip-cs-tor-01> 179   # từ máy KHÔNG trong whitelist -> kỳ vọng re
 
 ## Kiểm tra kết quả
 
-  | Hạng mục cần kiểm tra | Cách kiểm tra | Kết quả đúng |
-  | --- | --- | --- |
-  | FRR ≥ 10 chạy trên toàn bộ node | `vtysh -c "show version"` | Version ≥ 10, `active` |
-  | Symlink EVPN đã áp | `ls -la /usr/share/modifyvxlan.sh` | Trỏ vào `modifyvxlan-evpn.sh`, trên cả 3 compute node |
-  | BGP eBGP session thiết lập | `show bgp l2vpn evpn summary` | `Established` đúng theo phân bổ host↔ToR |
-  | `cs-tor-01`/`cs-tor-02` đóng vòng | `show bgp l2vpn evpn summary` trên cả 2 `cs-tor` | Established với nhau |
-  | Firewall BGP đúng scope | `nc -zv <tor-ip> 179` từ máy ngoài whitelist | Refused/timeout |
-  | MD5 auth bắt buộc | Test session thiếu password | Không `Established` |
+| Hạng mục cần kiểm tra | Cách kiểm tra | Kết quả đúng |
+| --- | --- | --- |
+| FRR ≥ 10 chạy trên toàn bộ node | `vtysh -c "show version"` | Version ≥ 10, `active` |
+| Symlink EVPN đã áp | `ls -la /usr/share/modifyvxlan.sh` | Trỏ vào `modifyvxlan-evpn.sh`, trên cả 3 compute node |
+| BGP eBGP session thiết lập | `show bgp l2vpn evpn summary` | `Established` đúng theo phân bổ host↔ToR |
+| `cs-tor-01`/`cs-tor-02` đóng vòng | `show bgp l2vpn evpn summary` trên cả 2 `cs-tor` | Established với nhau |
+| Firewall BGP đúng scope | `nc -zv <tor-ip> 179` từ máy ngoài whitelist | Refused/timeout |
+| MD5 auth bắt buộc | Test session thiếu password | Không `Established` |
 
 > [!NOTE]
 > Lab này **chưa thể** kiểm chứng việc học MAC/IP qua Type-2 hay traffic VM cross-host thật — vì CloudStack chưa tạo Guest network/VXLAN device nào ở giai đoạn này (chỉ xảy ra sau khi tạo Zone/Network ở [[CloudStack Advanced Zone - Triển khai Network SDN và Storage]] và deploy VM ở [[CloudStack Template - Import Guest OS Template và Deploy VM đầu tiên]]). Kiểm chứng đầy đủ end-to-end (`show bgp l2vpn evpn route type macip`, ping cross-host) nằm ở mục Kiểm tra kết quả của 2 lab đó.

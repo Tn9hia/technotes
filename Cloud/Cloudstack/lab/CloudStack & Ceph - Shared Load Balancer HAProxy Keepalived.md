@@ -283,15 +283,15 @@ sudo ufw allow from <admin-jumphost-cidr> to any port 8404 proto tcp comment 'ha
 
 ## Kiểm tra kết quả
 
-  | Hạng mục cần kiểm tra | Cách kiểm tra | Kết quả đúng |
-  | --- | --- | --- |
-  | VIP xuất hiện trên node MASTER | `ip addr show <ops-nic>` | Có `<vip-dung-chung>` |
-  | CloudStack UI/API qua VIP | `curl -k https://<vip>/client/api?command=listCapabilities` | Trả JSON |
-  | Galera write pool luôn 1 node | `mysql -h <vip> -P3306 -e "SELECT @@hostname;"` lặp lại | Luôn cùng hostname |
-  | Galera read pool round-robin | `mysql -h <vip> -P3307 -e "SELECT @@hostname;"` lặp lại | Hostname xoay vòng |
-  | Ceph Dashboard qua VIP | `curl -k https://<vip>:8443/` | HTTP 200, load đúng Dashboard của mgr active |
-  | Failover LB | Stop `keepalived` trên node MASTER, lặp lại 3 test trên | VIP chuyển sang node còn lại, không mất dịch vụ nào trong 3 nhóm |
-  | HAProxy stats page | `curl -s -u admin:<haproxy-stats-password> http://<ip-cs-lb-01>:8404/` | HTTP 200, thấy đủ backend `cloudstack_ms`, `galera_write`, `galera_read`, `ceph_dashboard_mgr` |
+| Hạng mục cần kiểm tra | Cách kiểm tra | Kết quả đúng |
+| --- | --- | --- |
+| VIP xuất hiện trên node MASTER | `ip addr show <ops-nic>` | Có `<vip-dung-chung>` |
+| CloudStack UI/API qua VIP | `curl -k https://<vip>/client/api?command=listCapabilities` | Trả JSON |
+| Galera write pool luôn 1 node | `mysql -h <vip> -P3306 -e "SELECT @@hostname;"` lặp lại | Luôn cùng hostname |
+| Galera read pool round-robin | `mysql -h <vip> -P3307 -e "SELECT @@hostname;"` lặp lại | Hostname xoay vòng |
+| Ceph Dashboard qua VIP | `curl -k https://<vip>:8443/` | HTTP 200, load đúng Dashboard của mgr active |
+| Failover LB | Stop `keepalived` trên node MASTER, lặp lại 3 test trên | VIP chuyển sang node còn lại, không mất dịch vụ nào trong 3 nhóm |
+| HAProxy stats page | `curl -s -u admin:<haproxy-stats-password> http://<ip-cs-lb-01>:8404/` | HTTP 200, thấy đủ backend `cloudstack_ms`, `galera_write`, `galera_read`, `ceph_dashboard_mgr` |
 
 ## Troubleshooting
 

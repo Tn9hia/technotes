@@ -295,16 +295,16 @@ cmk update zone id=<zone-id> allocationstate=Enabled
 
 ## Kiểm tra kết quả
 
-  | Hạng mục cần kiểm tra | Cách kiểm tra | Kết quả đúng |
-  | --- | --- | --- |
-  | Zone | `cmk list zones name=<tên-zone>` | `allocationstate=Enabled` |
-  | Physical Network VXLAN | `cmk list physicalnetworks zoneid=<zone-id>` | `state=Enabled`, `isolationmethods=VXLAN`, đúng range VNI |
-  | 4 traffic label | `cmk list traffictypes physicalnetworkid=<physical-network-id>` | Đủ Management/Storage/Guest/Public, `kvmnetworklabel` Guest = `cloudbr-guest` |
-  | Cluster/Host | `cmk list hosts zoneid=<zone-id>` | Cả 3 host `Up` |
-  | Primary Storage | `cmk list storagepools zoneid=<zone-id>` | `state=Up` |
-  | Secondary Storage | `cmk list imagestores zoneid=<zone-id>` | Xuất hiện, reachable |
-  | System VM tự khởi tạo | UI → Infrastructure → System VMs | SSVM và CPVM ở trạng thái `Running` sau vài phút kể từ khi Enable Zone |
-  | VXLAN device xuất hiện đúng trên FRR | Sau khi SSVM/CPVM lên, chạy `vtysh -c "show bgp l2vpn evpn summary"` trên compute node đang chạy SSVM/CPVM | Thấy route mới xuất hiện — xác nhận `advertise-all-vni` đã bắt được VXLAN device do CloudStack tự tạo |
+| Hạng mục cần kiểm tra | Cách kiểm tra | Kết quả đúng |
+| --- | --- | --- |
+| Zone | `cmk list zones name=<tên-zone>` | `allocationstate=Enabled` |
+| Physical Network VXLAN | `cmk list physicalnetworks zoneid=<zone-id>` | `state=Enabled`, `isolationmethods=VXLAN`, đúng range VNI |
+| 4 traffic label | `cmk list traffictypes physicalnetworkid=<physical-network-id>` | Đủ Management/Storage/Guest/Public, `kvmnetworklabel` Guest = `cloudbr-guest` |
+| Cluster/Host | `cmk list hosts zoneid=<zone-id>` | Cả 3 host `Up` |
+| Primary Storage | `cmk list storagepools zoneid=<zone-id>` | `state=Up` |
+| Secondary Storage | `cmk list imagestores zoneid=<zone-id>` | Xuất hiện, reachable |
+| System VM tự khởi tạo | UI → Infrastructure → System VMs | SSVM và CPVM ở trạng thái `Running` sau vài phút kể từ khi Enable Zone |
+| VXLAN device xuất hiện đúng trên FRR | Sau khi SSVM/CPVM lên, chạy `vtysh -c "show bgp l2vpn evpn summary"` trên compute node đang chạy SSVM/CPVM | Thấy route mới xuất hiện — xác nhận `advertise-all-vni` đã bắt được VXLAN device do CloudStack tự tạo |
 
 - Xác nhận SSVM/CPVM tự tạo thành công sau khi enable — đây là bằng chứng end-to-end rằng Secondary Storage, Pod network, và hypervisor đã thông suốt:
 

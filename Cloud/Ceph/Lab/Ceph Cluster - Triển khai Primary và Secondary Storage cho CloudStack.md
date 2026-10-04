@@ -18,15 +18,15 @@
 - **Hạ tầng**: CloudStack Management Server và ít nhất 1 KVM Cluster/Host đã cài đặt, add vào zone, đang ở trạng thái Up. DNS/NTP nội bộ hoạt động, các node Ceph resolve được lẫn nhau (qua DNS nội bộ hoặc `/etc/hosts`).
 - **Máy chủ / VM**: 7 server Ubuntu 24.04 riêng biệt, không chạy service nào khác ngoài Ceph. Disk dùng cho OSD trong bài lab là disk ảo VMware; trên hạ tầng thật cần cấu hình passthrough (JBOD), không dùng RAID, để tối ưu hiệu năng và giữ đúng mô hình 1 OSD : 1 disk vật lý mà Ceph kỳ vọng.
 
-  | Host name | Vai trò | CPU - RAM - DISK |
-  | --- | --- | --- |
-  | ceph-01 | control-plane + gateway (mon, mgr, mds, nfs), label `_admin` | 4 vCPU - 8 GB - (OS 50GB) |
-  | ceph-02 | control-plane + gateway (mon, mgr, mds, nfs) | 4 vCPU - 8 GB - (OS 50GB) |
-  | ceph-03 | control-plane + gateway (mon, mgr, mds, nfs) | 4 vCPU - 8 GB - (OS 50GB) |
-  | ceph-04 | storage node (osd) | 4 vCPU - 8 GB - (OS 50GB, data 200GB x3) |
-  | ceph-05 | storage node (osd) | 4 vCPU - 8 GB - (OS 50GB, data 200GB x3) |
-  | ceph-06 | storage node (osd) | 4 vCPU - 8 GB - (OS 50GB, data 200GB x3) |
-  | ceph-07 | storage node (osd) | 4 vCPU - 8 GB - (OS 50GB, data 200GB x3) |
+| Host name | Vai trò | CPU - RAM - DISK |
+| --- | --- | --- |
+| ceph-01 | control-plane + gateway (mon, mgr, mds, nfs), label `_admin` | 4 vCPU - 8 GB - (OS 50GB) |
+| ceph-02 | control-plane + gateway (mon, mgr, mds, nfs) | 4 vCPU - 8 GB - (OS 50GB) |
+| ceph-03 | control-plane + gateway (mon, mgr, mds, nfs) | 4 vCPU - 8 GB - (OS 50GB) |
+| ceph-04 | storage node (osd) | 4 vCPU - 8 GB - (OS 50GB, data 200GB x3) |
+| ceph-05 | storage node (osd) | 4 vCPU - 8 GB - (OS 50GB, data 200GB x3) |
+| ceph-06 | storage node (osd) | 4 vCPU - 8 GB - (OS 50GB, data 200GB x3) |
+| ceph-07 | storage node (osd) | 4 vCPU - 8 GB - (OS 50GB, data 200GB x3) |
 
 - **Tài khoản và quyền**: user sudo trên cả 7 node để cài đặt và cho `cephadm` SSH vào orchestrate.
 - **Mạng**: tách 2 dải mạng riêng biệt — mgt/user access network (SSH, cephadm orchestration, Dashboard, client RBD/NFS) và storage network (OSD replication/heartbeat, nội bộ giữa các node Ceph). Storage network (OSD) cần switch hỗ trợ Jumbo Frame, bật MTU 9000 để giảm CPU overhead và tránh phân mảnh gói tin khi replicate dữ liệu giữa các OSD. Chỉ 4 node storage (ceph-04..07) cần có interface trên storage network (OSD); 3 node control-plane/gateway chỉ cần mgt/user access network.
@@ -643,14 +643,14 @@ sudo ceph -s
 
 - Trong CloudStack UI: **Infrastructure → Primary Storage → Add Primary Storage**, khai báo:
 
-  | Trường | Giá trị |
-  | --- | --- |
-  | Protocol | `RBD` |
-  | Server | `<ip-node01>,<ip-node02>,<ip-node03>` |
-  | Port | `6789` |
-  | Path (pool) | `cloudstack-primary` |
-  | CephX username | `cloudstack-rbd` |
-  | CephX secret | `<secret-key-lấy-ở-bước-6>` |
+| Trường | Giá trị |
+| --- | --- |
+| Protocol | `RBD` |
+| Server | `<ip-node01>,<ip-node02>,<ip-node03>` |
+| Port | `6789` |
+| Path (pool) | `cloudstack-primary` |
+| CephX username | `cloudstack-rbd` |
+| CephX secret | `<secret-key-lấy-ở-bước-6>` |
 
 > [!NOTE]
 > Server khai báo là 3 mon (ceph-01/02/03) — client librbd tự chọn mon còn quorum để kết nối, không phụ thuộc 1 node duy nhất. CloudStack Agent trên KVM host tự động tạo libvirt secret từ username/secret khai báo ở trên (`virsh secret-define`) — admin không cần thao tác `virsh` thủ công.
@@ -667,11 +667,11 @@ Kết quả mong đợi: thấy image tương ứng với volume vừa tạo tr�
 
 - Trong CloudStack UI: **Infrastructure → Secondary Storage → Add Secondary Storage**, khai báo:
 
-  | Trường | Giá trị |
-  | --- | --- |
-  | Provider | `NFS` |
-  | Server | `<nfs-vip>` |
-  | Path | `/cloudstack-secondary` |
+| Trường | Giá trị |
+| --- | --- |
+| Provider | `NFS` |
+| Server | `<nfs-vip>` |
+| Path | `/cloudstack-secondary` |
 
 - Upload thử 1 template hoặc ISO nhỏ, xác nhận SSVM ghi được vào NFS export:
 
@@ -679,12 +679,12 @@ Kết quả mong đợi: thấy image tương ứng với volume vừa tạo tr�
 ssh <ssvm-ip> "df -h | grep cloudstack-secondary"
 ```
 
-  | Hạng mục cần kiểm tra | Cách kiểm tra | Kết quả đúng |
-  | --- | --- | --- |
-  | Cụm Ceph healthy | `ceph -s` | `HEALTH_OK` |
-  | Primary Storage nhận volume | `rbd -p cloudstack-primary --id cloudstack-rbd ls` | Thấy RBD image mới tạo từ UI |
-  | Secondary Storage mount trên SSVM | `df -h` trên SSVM | Thấy mount point trỏ `<nfs-vip>:/cloudstack-secondary` |
-  | Upload template thành công | UI CloudStack → Templates | Trạng thái `Ready` |
+| Hạng mục cần kiểm tra | Cách kiểm tra | Kết quả đúng |
+| --- | --- | --- |
+| Cụm Ceph healthy | `ceph -s` | `HEALTH_OK` |
+| Primary Storage nhận volume | `rbd -p cloudstack-primary --id cloudstack-rbd ls` | Thấy RBD image mới tạo từ UI |
+| Secondary Storage mount trên SSVM | `df -h` trên SSVM | Thấy mount point trỏ `<nfs-vip>:/cloudstack-secondary` |
+| Upload template thành công | UI CloudStack → Templates | Trạng thái `Ready` |
 
 ## Troubleshooting
 

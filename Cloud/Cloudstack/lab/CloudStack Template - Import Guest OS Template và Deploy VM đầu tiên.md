@@ -209,13 +209,13 @@ Kết quả mong đợi: SSH thành công bằng key, không cần password — 
 
 ## Kiểm tra kết quả
 
-  | Hạng mục cần kiểm tra | Cách kiểm tra | Kết quả đúng |
-  | --- | --- | --- |
-  | Template sẵn sàng | `cmk list templates templatefilter=all name=<template-name>` | `isready=true` |
-  | VM chạy | `cmk list virtualmachines name=<vm-test-name>` | `state=Running` |
-  | Disk nằm trên Ceph RBD | `rbd -p cloudstack-primary --id cloudstack-rbd ls` (chạy trên Ceph admin node) | Thấy volume tương ứng VM vừa tạo |
-  | SSH từ ngoài vào VM | `ssh -i <key> ubuntu@<public-ip>` | Đăng nhập thành công bằng key, không cần password |
-  | VM có internet ra ngoài | Từ trong VM: `curl -I https://download.cloudstack.org` | Nhận HTTP response, xác nhận SNAT qua Virtual Router hoạt động |
+| Hạng mục cần kiểm tra | Cách kiểm tra | Kết quả đúng |
+| --- | --- | --- |
+| Template sẵn sàng | `cmk list templates templatefilter=all name=<template-name>` | `isready=true` |
+| VM chạy | `cmk list virtualmachines name=<vm-test-name>` | `state=Running` |
+| Disk nằm trên Ceph RBD | `rbd -p cloudstack-primary --id cloudstack-rbd ls` (chạy trên Ceph admin node) | Thấy volume tương ứng VM vừa tạo |
+| SSH từ ngoài vào VM | `ssh -i <key> ubuntu@<public-ip>` | Đăng nhập thành công bằng key, không cần password |
+| VM có internet ra ngoài | Từ trong VM: `curl -I https://download.cloudstack.org` | Nhận HTTP response, xác nhận SNAT qua Virtual Router hoạt động |
 
 - Sau khi xác nhận đủ 5 hạng mục trên, Zone chính thức sẵn sàng bàn giao. Xoá VM test nếu chỉ dùng để kiểm tra:
 

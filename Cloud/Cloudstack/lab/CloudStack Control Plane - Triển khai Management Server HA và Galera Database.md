@@ -305,7 +305,7 @@ CS_VERSION=<xác-nhận-bản-cụ-thể>                      # ví dụ: 4.19
 sudo install -d -m 0755 /etc/apt/keyrings
 curl -fsSL http://download.cloudstack.org/release.asc | sudo gpg --dearmor -o /etc/apt/keyrings/cloudstack.gpg
 echo "deb [signed-by=/etc/apt/keyrings/cloudstack.gpg] http://download.cloudstack.org/deb $CS_CODENAME $CS_VERSION main" \
-  | sudo tee /etc/apt/sources.list.d/cloudstack.list
+| sudo tee /etc/apt/sources.list.d/cloudstack.list
 sudo apt update
 ```
 
@@ -483,14 +483,14 @@ curl -k https://<vip-control-plane>/client/api?command=listCapabilities
 sudo systemctl start cloudstack-management  # khôi phục lại sau khi xác nhận
 ```
 
-  | Hạng mục cần kiểm tra | Cách kiểm tra | Kết quả đúng |
-  | --- | --- | --- |
-  | Galera cluster quorum | `SHOW STATUS LIKE 'wsrep_cluster_size';` trên cả 3 node DB | `3` |
-  | Cả 2 MS đăng ký đúng IP | `SELECT * FROM cloud.mshost;` | 2 dòng, `service_ip` đúng từng node |
-  | System VM template sẵn sàng | `SELECT name,state FROM cloud.vm_template WHERE type='SYSTEM';` | `state = Ready` |
-  | VIP hoạt động khi 1 MS down | `curl -k https://<vip>/client/api?command=listCapabilities` sau khi stop 1 MS | Vẫn trả JSON, không lỗi |
-  | Write pool luôn đi đúng 1 node | `mysql -h <vip> -P3306 -e "SELECT @@hostname;"` lặp lại nhiều lần | Luôn cùng 1 hostname (node writer đang active) |
-  | Read pool round-robin | `mysql -h <vip> -P3307 -e "SELECT @@hostname;"` lặp lại nhiều lần | Hostname xoay vòng qua cả 3 node |
+| Hạng mục cần kiểm tra | Cách kiểm tra | Kết quả đúng |
+| --- | --- | --- |
+| Galera cluster quorum | `SHOW STATUS LIKE 'wsrep_cluster_size';` trên cả 3 node DB | `3` |
+| Cả 2 MS đăng ký đúng IP | `SELECT * FROM cloud.mshost;` | 2 dòng, `service_ip` đúng từng node |
+| System VM template sẵn sàng | `SELECT name,state FROM cloud.vm_template WHERE type='SYSTEM';` | `state = Ready` |
+| VIP hoạt động khi 1 MS down | `curl -k https://<vip>/client/api?command=listCapabilities` sau khi stop 1 MS | Vẫn trả JSON, không lỗi |
+| Write pool luôn đi đúng 1 node | `mysql -h <vip> -P3306 -e "SELECT @@hostname;"` lặp lại nhiều lần | Luôn cùng 1 hostname (node writer đang active) |
+| Read pool round-robin | `mysql -h <vip> -P3307 -e "SELECT @@hostname;"` lặp lại nhiều lần | Hostname xoay vòng qua cả 3 node |
 
 > [!NOTE]
 > Các phép test write/read pool và HAProxy stats page đầy đủ hơn nằm ở mục Kiểm tra kết quả của [[CloudStack & Ceph - Shared Load Balancer HAProxy Keepalived]] — lab đó là nơi trực tiếp cấu hình HAProxy.

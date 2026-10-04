@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/nghia/.claude/skills/researcher/assets/**)",
+      "Read(//Users/nghia/.claude/skills/researcher/**)",
+      "WebSearch",
+      "WebFetch(domain:docs.cloud-init.io)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(curl -sL \"https://api.github.com/repos/canonical/cloud-init/contents/systemd?ref=26.2\")",
+      "Bash(curl -sL \"https://raw.githubusercontent.com/canonical/cloud-init/26.2/cloudinit/config/cc_ssh.py\")",
+      "Bash(curl -sL \"https://raw.githubusercontent.com/canonical/cloud-init/26.2/cloudinit/config/cc_set_passwords.py\")",
+      "Bash(curl -sL \"https://raw.githubusercontent.com/canonical/cloud-init/26.2/config/cloud.cfg.tmpl\")",
+      "Bash(curl -sL \"https://raw.githubusercontent.com/canonical/cloud-init/26.2/cloudinit/cmd/status.py\")",
+      "Bash(curl -sL \"https://docs.cloud-init.io/en/latest/_sources/development/logging.rst.txt\" -o dev_logging.rst)",
+      "Bash(curl -sL \"https://raw.githubusercontent.com/canonical/cloud-init/26.2/cloudinit/config/cc_growpart.py\")",
+      "Bash(curl -sL \"https://docs.cloud-init.io/en/latest/_sources/explanation/security.rst.txt\" -o /tmp/explanation_security.rst)",
+      "Bash(curl -sL \"https://docs.cloud-init.io/en/latest/_sources/explanation/hardening.rst.txt\" -o /tmp/explanation_hardening.rst)",
+      "Bash(curl -sL \"https://raw.githubusercontent.com/canonical/cloud-init/26.2/cloudinit/sources/DataSourceCloudStack.py\")",
+      "Bash(curl -sL \"https://docs.cloud-init.io/en/latest/_sources/reference/breaking_changes.rst.txt\" -o /tmp/breaking_changes.rst)"
+    ]
+  }
+}

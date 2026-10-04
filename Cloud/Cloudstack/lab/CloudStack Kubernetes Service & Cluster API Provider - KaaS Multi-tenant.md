@@ -335,15 +335,15 @@ Kết quả mong đợi: API trả lỗi vượt Resource Limit, không deploy V
 
 ## Kiểm tra kết quả
 
-  | Hạng mục cần kiểm tra | Cách kiểm tra | Kết quả đúng |
-  | --- | --- | --- |
-  | CKS enabled | `list configurations name=cloud.kubernetes.service.enabled` | `true` |
-  | Kubernetes Supported Version | `list kubernetessupportedversions` | `state=Enabled` |
-  | CKS cluster tenant A chạy | `list kubernetesclusters account=acme-prod` | `state=Running`, đủ node |
-  | Resource Limit chặn đúng | Tạo cluster vượt quota | API trả lỗi, không tạo VM |
-  | CAPC controller chạy | `kubectl get pods -n capc-system` | `Running` |
-  | Workload cluster CAPC tính đúng Account | `cmk list virtualmachines account=acme-prod` | Thấy VM do CAPC tạo |
-  | Cô lập network giữa 2 tenant | `ping` chéo giữa 2 cluster | Không reach được |
+| Hạng mục cần kiểm tra | Cách kiểm tra | Kết quả đúng |
+| --- | --- | --- |
+| CKS enabled | `list configurations name=cloud.kubernetes.service.enabled` | `true` |
+| Kubernetes Supported Version | `list kubernetessupportedversions` | `state=Enabled` |
+| CKS cluster tenant A chạy | `list kubernetesclusters account=acme-prod` | `state=Running`, đủ node |
+| Resource Limit chặn đúng | Tạo cluster vượt quota | API trả lỗi, không tạo VM |
+| CAPC controller chạy | `kubectl get pods -n capc-system` | `Running` |
+| Workload cluster CAPC tính đúng Account | `cmk list virtualmachines account=acme-prod` | Thấy VM do CAPC tạo |
+| Cô lập network giữa 2 tenant | `ping` chéo giữa 2 cluster | Không reach được |
 
 ## Troubleshooting
 
