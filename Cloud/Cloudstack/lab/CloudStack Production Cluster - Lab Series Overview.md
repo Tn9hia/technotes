@@ -133,5 +133,9 @@ Series dừng lại ở một Zone production tối thiểu cùng dịch vụ Ka
 - Billing/metering chi tiết cho mô hình cloud provider (usage server, tích hợp hệ thống billing ngoài) — nằm ngoài phạm vi Lab 8, vốn chỉ tập trung vào resource isolation/quota.
 - Fabric EVPN đa rack thật (leaf-spine vật lý, dual-uplink/host, underlay routing) — Lab 5 dùng thiết kế đơn giản hoá 1-NIC/host + FRR VM giả lập ToR cho quy mô lab; mở rộng lên fabric thật cần thiết kế lại theo đúng pattern dual-uplink + unnumbered BGP trong tài liệu chính thức, xem ghi chú trong lab đó.
 
+## Lab mở rộng (ngoài 8 lab gốc)
+
+- [[CloudStack Kubernetes Service - Node Template Ubuntu 22.04, Cilium CNI và CSI-CCM LoadBalancer]] — build riêng node template Ubuntu 22.04 (Packer + Ansible) thay System VM Debian mặc định của CKS, đổi CNI sang Cilium qua CNI Configuration framework, và xác nhận CSI driver + CCM cho `Service type=LoadBalancer`. Yêu cầu Lab 8 đã hoàn tất.
+
 ---
 *Xem thêm: [[Cloudstack|CloudStack Overview]] | [[Ceph|Ceph]] | [[CloudStack Prerequisites]]*
