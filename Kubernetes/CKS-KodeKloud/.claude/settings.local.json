@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(mkdir -p /private/tmp/claude-501/-Users-nghia-Library-CloudStorage-GoogleDrive-t-nghia2605-gmail-com-Other-computers-My-MacBook-Air-GoogleDrive-my-note-Kubernetes-CKS-KodeKloud/9c383eba-8c70-4539-825e-85716e865212/scratchpad)",
+      "Bash(curl -sL -o /private/tmp/claude-501/-Users-nghia-Library-CloudStorage-GoogleDrive-t-nghia2605-gmail-com-Other-computers-My-MacBook-Air-GoogleDrive-my-note-Kubernetes-CKS-KodeKloud/9c383eba-8c70-4539-825e-85716e865212/scratchpad/cks_curriculum.pdf https://raw.githubusercontent.com/cncf/curriculum/master/CKS_Curriculum%20v1.34.pdf)"
+    ]
+  }
+}

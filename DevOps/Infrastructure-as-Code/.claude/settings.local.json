@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:endoflife.date)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:developer.hashicorp.com)",
+      "WebFetch(domain:www.cloudstackcollab.org)",
+      "WebFetch(domain:openmetal.io)"
+    ]
+  }
+}

@@ -19,6 +19,7 @@ Packer (HashiCorp) là tool để **build machine image** từ code — một te
 | [[Core Concepts]] | HCL2 template structure, `source`/`build` block, builders (amazon-ebs, virtualbox-iso, docker, qemu), variables, plugins |
 | [[Provisioners & Post-Processors]] | Shell/Ansible provisioner, post-processors (vagrant, compress, manifest, docker-tag/push), multi-target build |
 | [[CLI Reference]] | `packer init/build/validate/fmt/inspect`, env vars, debug recipes |
+| [[OpenStack & CloudStack Builders]] | `source "openstack"`/`"cloudstack"`, build native trên cloud vs build offline qua `qemu` + import, auth, image format theo hypervisor, sysprep golden image |
 
 ---
 
@@ -93,3 +94,5 @@ Một Packer template có thể build ra **nhiều target cùng lúc** từ cùn
 - Dùng image do Packer build làm `config.vm.box`: xem [[Vagrant]] → [[Core Concepts]] (mục Boxes)
 - Terraform tham chiếu AMI ID do Packer build ra (thường qua `data "aws_ami"` filter theo tag/name): xem [[Terraform]] → [[Core Concepts]] (mục Data Sources)
 - Provisioner Ansible dùng trong Packer giống hệt cú pháp dùng trong Vagrant: xem [[Ansible - Overview]]
+- Build image cho OpenStack/CloudStack (builder native vs offline qua `qemu`, auth, sysprep): xem [[OpenStack & CloudStack Builders]]
+- Kiến trúc OpenStack đích build ra image: xem [[OpenStack]]; Kiến trúc CloudStack: xem [[Cloudstack]]

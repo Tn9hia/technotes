@@ -6,7 +6,23 @@
       "Bash(grep -rli \"tungsten\" .)",
       "Bash(grep -rl \"cloudstack-ms0\\\\|cloudstack-db0\\\\|cloudstack-kvm0\" .)",
       "Bash(git -C \"/Users/nghia/Library/CloudStorage/GoogleDrive-t.nghia2605@gmail.com/Other computers/My MacBook Air/GoogleDrive/my-note/Cloud\" mv \"Cloudstack/lab/CloudStack Native VXLAN - Triển khai Guest Network Isolation.md\" \"Cloudstack/lab/CloudStack VXLAN EVPN - Triển khai Guest Network Isolation với FRRouting.md\")",
-      "WebFetch(domain:docs.cloudstack.apache.org)"
+      "WebFetch(domain:docs.cloudstack.apache.org)",
+      "Read(//Users/nghia/.claude/skills/technical-writer/**)",
+      "Read(//Users/nghia/**)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:docs.cloudstack.one)",
+      "WebFetch(domain:cloudstack.apache.org)",
+      "WebFetch(domain:www.shapeblue.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:download.cloudstack.org)",
+      "Bash(gh api *)",
+      "Bash(curl -s https://api.github.com/repos/hashicorp/packer-plugin-cloudstack/contents/docs)",
+      "Bash(curl -s https://api.github.com/repos/hashicorp/packer-plugin-cloudstack/contents/)",
+      "Bash(curl -s https://api.github.com/repos/hashicorp/packer-plugin-cloudstack/contents/docs/builders)",
+      "Bash(curl *)",
+      "Bash(python3 -c ' *)",
+      "Bash(python3 *)"
     ]
   }
 }

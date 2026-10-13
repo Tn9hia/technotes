@@ -166,6 +166,10 @@ source "qemu" "app" {
 }
 ```
 
+### openstack / cloudstack (build image cho private cloud)
+
+Packer cũng có builder native `source "openstack"` và `source "cloudstack"` để build/snapshot image ngay trên 1 cloud OpenStack/CloudStack đang chạy — nhưng cả 2 builder này có giới hạn thực tế riêng (đặc biệt `cloudstack` build từ ISO) nên tách thành note riêng: xem [[OpenStack & CloudStack Builders]] cho source block đầy đủ, auth, và khi nào nên build qua `qemu` ở trên rồi import thay vì dùng builder native.
+
 ---
 
 ## Build Block — Liên kết mọi thứ
