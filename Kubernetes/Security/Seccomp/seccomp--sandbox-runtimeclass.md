@@ -22,22 +22,32 @@ Seccomp giới hạn syscall nhưng vẫn cho container **share chung kernel hos
 
 ## How it works (2 kiến trúc khác nhau hoàn toàn)
 
-```
-Container thường (runc)          gVisor (runsc)                Kata Containers
-┌─────────────┐                  ┌─────────────┐               ┌─────────────┐
-│  App process │                  │  App process │               │  App process │
-└──────┬──────┘                  └──────┬──────┘               └──────┬──────┘
-       │ syscall trực tiếp              │ syscall                     │ syscall
-       ▼                                ▼                             ▼
-┌─────────────┐                  ┌─────────────┐               ┌─────────────┐
-│ seccomp-BPF  │ (lọc, không cô  │   Sentry     │ (user-space   │ Guest kernel │ ← kernel
-│ filter       │  lập kernel)    │ (app kernel) │  chặn/giả lập)│ (riêng biệt) │   RIÊNG
-└──────┬──────┘                  └──────┬──────┘               └──────┬──────┘
-       ▼                                ▼                             ▼
-   Host kernel                Host kernel (chỉ nhận ~50           KVM hypervisor
-  (chia sẻ, mọi                syscall rất hẹp từ Sentry,        (Host kernel chỉ
-   container dùng                dùng chính seccomp bên           thấy 1 VM, không
-   chung 1 kernel)               trong Sentry để tự giới hạn)     thấy syscall app)
+```d2
+direction: down
+
+runc: "Container thường (runc)" {
+  app: "App process"
+  filter: "seccomp-BPF filter\n(lọc, không cô lập kernel)"
+  kernel: "Host kernel\n(chia sẻ, mọi container\ndùng chung 1 kernel)"
+  app -> filter: "syscall trực tiếp"
+  filter -> kernel
+}
+
+gvisor: "gVisor (runsc)" {
+  app: "App process"
+  sentry: "Sentry\n(app kernel, user-space)"
+  kernel: "Host kernel\n(chỉ nhận ~50 syscall hẹp;\nSentry tự áp seccomp\ncho chính nó)"
+  app -> sentry: "syscall"
+  sentry -> kernel
+}
+
+kata: "Kata Containers" {
+  app: "App process"
+  guestkernel: "Guest kernel\n(riêng biệt)"
+  hypervisor: "KVM hypervisor\n(host kernel chỉ thấy 1 VM,\nkhông thấy syscall app)"
+  app -> guestkernel: "syscall"
+  guestkernel -> hypervisor
+}
 ```
 
 - **gVisor**: chặn syscall ở **user-space** bằng 1 "application kernel" tên **Sentry**, viết bằng Go, tự implement lại phần lớn Linux syscall interface. App bên trong tưởng nó nói chuyện với kernel thật, thực ra đang nói chuyện với Sentry. Sentry chỉ cần gọi 1 tập syscall rất hẹp xuống host kernel thật (thường dẫn ví dụ ~50 syscall so với ~150-200+ của 1 seccomp profile tight cho container thường) — **bản thân Sentry cũng tự áp seccomp filter cho chính nó** khi gọi xuống host, tức là gVisor dùng seccomp như 1 lớp phòng thủ nội bộ, không thay thế seccomp.

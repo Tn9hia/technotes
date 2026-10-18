@@ -20,22 +20,14 @@ Vulnerability data thay đổi liên tục (CVE mới mỗi ngày) trong khi bin
 
 ## How it works (flow/diagram)
 
-```
-trivy image alpine:3.20
-        │
-        ▼
-Cần trivy-db trong cache? ──có──▶ dùng cache (theo TTL/schema version)
-        │ không
-        ▼
-Thử pull theo thứ tự --db-repository (default):
-  1. mirror.gcr.io/aquasec/trivy-db:2      ← ưu tiên (đổi từ v0.57.1, tránh rate-limit GHCR)
-  2. ghcr.io/aquasecurity/trivy-db:2       ← fallback nếu (1) lỗi 429/5xx
-        │
-        ▼
-Lưu vào --cache-dir (mặc định theo OS: ~/.cache/trivy trên Linux)
-        │
-        ▼
-Chạy scan, so khớp package version với DB
+```mermaid
+flowchart TD
+    A["trivy image alpine:3.20"] --> B{"Cần trivy-db<br/>trong cache?"}
+    B -->|Có| C["Dùng cache<br/>(theo TTL/schema version)"]
+    B -->|Không| D["Thử pull theo thứ tự --db-repository (default):<br/>1. mirror.gcr.io/aquasec/trivy-db:2<br/>(ưu tiên, đổi từ v0.57.1, tránh rate-limit GHCR)<br/>2. ghcr.io/aquasecurity/trivy-db:2<br/>(fallback nếu (1) lỗi 429/5xx)"]
+    D --> E["Lưu vào --cache-dir<br/>(mặc định theo OS: ~/.cache/trivy trên Linux)"]
+    C --> F["Chạy scan,<br/>so khớp package version với DB"]
+    E --> F
 ```
 
 - Tag ảnh không chỉ định version cụ thể sẽ mặc định lấy theo **schema number** (`:2` cho trivy-db, `:1` cho trivy-java-db), không phải `:latest`.

@@ -12,15 +12,10 @@ CKS domain "Minimize Microservice Vulnerabilities" yêu cầu biết dùng AppAr
 
 ## How it works (flow)
 
-```
- Node (bạn/DaemonSet control)          API Server              kubelet trên Node
-┌──────────────────────────┐        ┌────────────────┐      ┌──────────────────────────┐
-│ /etc/apparmor.d/my-prof   │        │  Pod spec:      │      │ đọc field/annotation      │
-│ apparmor_parser -r ...    │───────▶│  securityContext│─────▶│ truyền profile NAME cho   │
-│ (PHẢI làm TRƯỚC khi pod   │  (K8s  │  .appArmorProfile│      │ container runtime (CRI)   │
-│  chạy trên node này)      │ không  │  .type: Localhost│      │ containerd/CRI-O attach   │
-│                            │ tự làm)│  .localhostProfile│     │ profile khi tạo container │
-└──────────────────────────┘        └────────────────┘      └──────────────────────────┘
+```mermaid
+flowchart LR
+    A["Node (bạn / DaemonSet control)<br/>/etc/apparmor.d/my-prof<br/>apparmor_parser -r ...<br/>(PHẢI làm TRƯỚC khi pod<br/>chạy trên node này)"] -->|"K8s KHÔNG tự làm việc này"| B["API Server<br/>Pod spec:<br/>securityContext.appArmorProfile<br/>.type: Localhost<br/>.localhostProfile"]
+    B --> C["kubelet trên Node<br/>đọc field/annotation,<br/>truyền profile NAME cho<br/>container runtime (CRI);<br/>containerd/CRI-O attach<br/>profile khi tạo container"]
 ```
 
 **Điểm mấu chốt: kubelet KHÔNG load profile lên node.** Phải tự đảm bảo profile đã tồn tại trên node (bake vào image, DaemonSet, config management) trước khi pod được schedule tới đó. Nếu thiếu → pod stuck ở `CreateContainerError`, không phải bị từ chối lúc schedule.

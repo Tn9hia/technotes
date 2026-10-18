@@ -29,33 +29,26 @@ Nếu không có SELinux: một service chạy bằng root (hoặc bị lỗi/b�
 
 ### 4. Where - Architecture — Nó nằm ở đâu trong hệ thống?
 
-```
-                     ┌─────────────────────────────────────────┐
-                     │              Userspace                  │
-                     │  policycoreutils, semanage, setsebool,   │
-                     │  restorecon, audit2allow, sealert ...    │
-                     └───────────────┬───────────────────────--┘
-                                     │ đọc/ghi policy, semanage store
-                                     ▼
-                     ┌─────────────────────────────────────────┐
-                     │   Policy store (/etc/selinux/targeted)   │
-                     │   compiled binary policy (policy.31...)  │
-                     └───────────────┬───────────────────────--┘
-                                     │ load vào kernel lúc boot / semodule
-                                     ▼
-┌──────────┐   syscall    ┌──────────────────────┐   AVC decision   ┌────────────┐
-│  Process │ ───────────▶ │  Kernel LSM hook      │ ───────────────▶│  Allow /   │
-│ (subject,│              │  (SELinux + AVC cache)│                  │  Deny +    │
-│  type_t) │ ◀─────────── │  so sánh source type  │ ◀─────────────── │  log AVC   │
-└──────────┘   syscall    │  vs target type theo  │   audit record   └────────────┘
-   kết quả                │  policy rule          │        │
-                          └──────────┬────────────┘        ▼
-                                     │              /var/log/audit/audit.log
-                                     ▼                (qua kernel audit subsystem)
-                     ┌─────────────────────────────────────────┐
-                     │   Object: file/dir/port/process khác     │
-                     │   mang label object_r:type_t:level       │
-                     └─────────────────────────────────────────┘
+```d2
+direction: down
+
+userspace: "Userspace\npolicycoreutils, semanage, setsebool,\nrestorecon, audit2allow, sealert ..."
+policystore: "Policy store (/etc/selinux/targeted)\ncompiled binary policy (policy.31...)"
+
+kernel: "Kernel LSM hook\n(SELinux + AVC cache)\nso sánh source type vs target type\ntheo policy rule"
+
+process: "Process\n(subject, type_t)"
+object: "Object: file / dir / port / process khác\nmang label object_r:type_t:level"
+audit: "/var/log/audit/audit.log\n(qua kernel audit subsystem)"
+
+userspace -> policystore: "đọc/ghi policy, semanage store"
+policystore -> kernel: "load vào kernel lúc boot / semodule"
+
+process -> kernel: "syscall"
+kernel -> process: "Allow / Deny"
+kernel -> object: "AVC decision"
+object -> kernel: "kết quả"
+kernel -> audit: "audit record (khi deny)"
 ```
 
 - **Vị trí:** hook ngay trong kernel, chạy **sau** DAC check — nghĩa là DAC pass rồi mới tới lượt SELinux; DAC deny thì SELinux không cần chạy.

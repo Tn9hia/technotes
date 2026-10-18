@@ -14,14 +14,12 @@ Nếu để app trong sandbox dùng thẳng socket API của host kernel, thì t
 
 ## How it works (flow/diagram)
 
-```
-App --socket syscall--> netstack (TCP/UDP/IP logic, 100% trong Sentry)
-                              │
-                        AF_PACKET socket (raw, tầng link)
-                              │
-                    veth/loopback device (do Docker/K8s network namespace tạo)
-                              │
-                          host network
+```mermaid
+flowchart TD
+    App["App<br/>socket syscall"] --> Netstack["netstack<br/>(TCP/UDP/IP logic,<br/>100% trong Sentry)"]
+    Netstack --> AFP["AF_PACKET socket<br/>(raw, tầng link)"]
+    AFP --> Veth["veth/loopback device<br/>(do Docker/K8s network namespace tạo)"]
+    Veth --> HostNet["host network"]
 ```
 
 - Sentry được start trong 1 network namespace có sẵn veth + loopback (giống Docker thường). gVisor **scrape địa chỉ/route** từ các device đó và tự cấu hình netstack dùng y hệt IP/route đó — app "thấy" mạng y như chạy trực tiếp trên host, nhưng traffic thực chất đi qua netstack trước.

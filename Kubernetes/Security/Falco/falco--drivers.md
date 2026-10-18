@@ -22,20 +22,19 @@ Falco cần visibility ở tầng syscall nhưng kernel mỗi distro/version m�
 
 ## How it works (flow/diagram)
 
-```
-Falco start
-    │
-    ▼
-engine.kind = ? ──kmod──▶ insmod driver.ko (khớp đúng `uname -r`)
-    │                         │
-    │                         └─ nếu kernel version không khớp → load FAIL
-    │
-    ├──ebpf────▶ load eBPF object file (cần .o build sẵn hoặc build tại chỗ
-    │                nhờ kernel headers) → verifier check → attach tracepoint
-    │
-    └──modern_ebpf (default)──▶ eBPF CO-RE object nhúng sẵn trong binary Falco
-                                    → dùng BTF của kernel để tự resolve struct offset
-                                    → không cần build lại theo kernel version
+```mermaid
+flowchart TD
+    Start["Falco start"] --> Kind{"engine.kind = ?"}
+
+    Kind -->|kmod| Kmod["insmod driver.ko<br/>(khớp đúng `uname -r`)"]
+    Kmod -->|"kernel version không khớp"| KmodFail["load FAIL"]
+
+    Kind -->|ebpf| Ebpf["load eBPF object file<br/>(cần .o build sẵn hoặc build tại chỗ<br/>nhờ kernel headers)"]
+    Ebpf --> EbpfVerify["verifier check →<br/>attach tracepoint"]
+
+    Kind -->|"modern_ebpf (default)"| Modern["eBPF CO-RE object<br/>nhúng sẵn trong binary Falco"]
+    Modern --> ModernBtf["dùng BTF của kernel để<br/>tự resolve struct offset"]
+    ModernBtf --> ModernDone["không cần build lại<br/>theo kernel version"]
 ```
 
 Modern eBPF dùng BTF (BPF Type Format) — thông tin kiểu dữ liệu kernel được nhúng sẵn (`/sys/kernel/btf/vmlinux`) để chương trình eBPF tự "hiểu" struct layout của kernel đang chạy, thay vì phải compile riêng cho từng kernel như legacy eBPF/kmod.

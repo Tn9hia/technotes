@@ -14,14 +14,14 @@ Kubernetes cần 1 cách chuẩn để chọn "container này chạy bằng runt
 
 ## How it works (flow/diagram)
 
-```
-kubelet → CRI (containerd hoặc CRI-O)
-             │
-             ├─ runtime "runc"  → chạy thẳng, share kernel host
-             └─ runtime "runsc" → containerd-shim-runsc-v1 → runsc → Sentry+Gofer (kernel riêng)
-                                                                     │
-                                                          RuntimeClass "gvisor"
-                                                          (Pod: runtimeClassName: gvisor)
+```mermaid
+flowchart TD
+    kubelet["kubelet"] --> CRI["CRI (containerd hoặc CRI-O)"]
+    CRI -->|"runtime 'runc'"| Runc["Chạy thẳng,<br/>share kernel host"]
+    CRI -->|"runtime 'runsc'"| Shim["containerd-shim-runsc-v1"]
+    Shim --> Runsc["runsc"]
+    Runsc --> Sentry["Sentry + Gofer<br/>(kernel riêng)"]
+    Sentry --> RC["RuntimeClass 'gvisor'<br/>(Pod: runtimeClassName: gvisor)"]
 ```
 
 ### Setup containerd (được support chính thức, tối thiểu containerd **1.3.9 hoặc 1.4.3**)

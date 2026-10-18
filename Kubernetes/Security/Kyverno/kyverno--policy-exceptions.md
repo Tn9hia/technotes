@@ -14,17 +14,11 @@ Không có PolicyException, muốn miễn trừ 1 case đặc biệt buộc ph�
 
 ## How it works (flow/diagram)
 
-```
-ClusterPolicy (enforce) ──match──▶ resource X
-                                        │
-                    có PolicyException nào exceptions.match resource X không?
-                                        │
-                          ┌─────────────┴─────────────┐
-                         Có                           Không
-                          │                             │
-                 rule đó bị SKIP cho resource X    enforce như bình thường
-                 (dù policy vẫn enforce cho
-                  resource khác)
+```mermaid
+flowchart TD
+    A["ClusterPolicy (enforce)<br/>match → resource X"] --> B{"Có PolicyException nào<br/>exceptions.match resource X không?"}
+    B -->|Có| C["Rule đó bị SKIP cho resource X<br/>(dù policy vẫn enforce cho resource khác)"]
+    B -->|Không| D["Enforce như bình thường"]
 ```
 
 Vấn đề (đã là CVE thật, xem Security notes): nếu có **2 PolicyException cùng match** 1 resource — 1 cái match chặt (theo tên cụ thể), 1 cái match lỏng (theo pattern/wildcard) — engine không đảm bảo áp dụng cái chặt hơn; kẻ tấn công có thể **cố ý đặt tên resource** để rơi vào phạm vi exception lỏng hơn, bypass hoàn toàn enforce dù không được cấp quyền cho case đó.

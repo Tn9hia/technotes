@@ -25,17 +25,15 @@ CEL là engine expression đã có sẵn trong Kubernetes core (dùng cho `Valid
 
 ## How it works (flow/diagram)
 
-```
-Legacy:  ClusterPolicy { rules: [ {validate}, {mutate}, {generate}, {verifyImages} ] }
-                              │
-                              ▼  JMESPath: {{ request.object.spec.containers[].image }}
-                         engine (kyverno.io/v1 apiVersion, group "kyverno.io")
+```mermaid
+flowchart TD
+    subgraph legacy ["Legacy: ClusterPolicy { rules: [validate, mutate, generate, verifyImages] }"]
+        L1["JMESPath:<br/>{{ request.object.spec.containers[].image }}"] --> L2["engine<br/>(kyverno.io/v1, group 'kyverno.io')"]
+    end
 
-CEL:     ValidatingPolicy / MutatingPolicy / GeneratingPolicy / DeletingPolicy / ImageValidatingPolicy
-         (mỗi cái là 1 CRD riêng, group "policies.kyverno.io/v1")
-                              │
-                              ▼  CEL: object.spec.containers.all(c, c.image.matches('...'))
-                         engine mới (không dùng JMESPath, không có autogen annotation cũ)
+    subgraph cel ["CEL: ValidatingPolicy / MutatingPolicy / GeneratingPolicy /<br/>DeletingPolicy / ImageValidatingPolicy (mỗi cái 1 CRD riêng,<br/>group 'policies.kyverno.io/v1')"]
+        C1["CEL:<br/>object.spec.containers.all(c, c.image.matches('...'))"] --> C2["engine mới<br/>(không dùng JMESPath, không có autogen annotation cũ)"]
+    end
 ```
 
 Autogen cho pod controller (Deployment/StatefulSet/DaemonSet/Job/CronJob) là cơ chế **chỉ tồn tại ở legacy `ClusterPolicy`**: viết rule nhắm `Pod`, Kyverno tự thêm match cho các controller cha, đặt annotation `pod-policies.kyverno.io/autogen-controllers` (default `DaemonSet,Deployment,Job,StatefulSet,CronJob`) lên chính policy đó và tự sinh thêm rule đặt pattern dưới `spec.template.spec` (CronJob cần rule riêng vì lồng thêm 1 cấp `spec.jobTemplate.spec.template.spec`). CEL-based type xử lý pod controller theo cơ chế khác (chưa xác nhận chi tiết trong docs — cần đọc kỹ `docs/policy-types/` bản mới nhất khi thực hành).

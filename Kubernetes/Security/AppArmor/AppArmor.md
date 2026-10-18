@@ -23,18 +23,23 @@ Nếu không có nó: 1 service bị exploit (RCE) thì attacker có full quyề
 
 ### **4. Where - Architecture — Nó nằm ở đâu trong hệ thống?**
 
-```
- User space                          Kernel space
-┌─────────────────┐    load        ┌──────────────────────────┐
-│ /etc/apparmor.d/ │ ─────────────▶ │  LSM hook (apparmor)      │
-│  profile files   │ apparmor_parser│  attached vào mọi syscall │
-└─────────────────┘                │  đụng file/network/        │
-        ▲                          │  capability/ptrace/signal │
-        │ aa-genprof/aa-logprof    │                            │
-        │ (đọc log, gợi ý rule)    │  quyết định: ALLOW / DENY  │
-        │                          └──────────────┬─────────────┘
-        │                                         │ log
-   /var/log/audit/audit.log  ◀── auditd/journald ─┘  (apparmor="DENIED"/"ALLOWED")
+```d2
+direction: right
+
+profiles: "/etc/apparmor.d/\nprofile files"
+
+kernel: "Kernel space" {
+  lsm: "LSM hook (apparmor)\nattached vào mọi syscall\nđụng file / network /\ncapability / ptrace / signal"
+  decision: "ALLOW / DENY"
+  lsm -> decision
+}
+
+profiles -> kernel.lsm: "load\n(apparmor_parser)"
+kernel.decision -> audit: "log"
+
+audit: "/var/log/audit/audit.log\n(qua auditd/journald)\napparmor=\"DENIED\" / \"ALLOWED\""
+
+audit -> profiles: "aa-genprof / aa-logprof\n(đọc log, gợi ý rule)"
 ```
 
 - Nằm giữa syscall và VFS/network stack — chặn TRƯỚC khi request chạm resource thật.

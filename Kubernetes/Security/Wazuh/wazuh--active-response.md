@@ -14,18 +14,11 @@ Phản ứng thủ công của SOC quá chậm với threat di chuyển nhanh (b
 
 ## How it works (flow/diagram)
 
-```
-rule fire (level/group match cấu hình <active-response>)
-     │
-     ▼
-manager gửi lệnh tới agent liên quan
-     │
-     ▼
-agent chạy script local (vd firewall-drop.sh) với quyền thường là root/admin
-     │
-     ▼
-action được log lại; có thể auto-revert sau <timeout>, hoặc escalate nếu
-"repeated offenders" (vi phạm lặp lại) — block lâu hơn theo cấp số nhân
+```mermaid
+flowchart TD
+    A["rule fire<br/>(level/group match cấu hình &lt;active-response&gt;)"] --> B["manager gửi lệnh<br/>tới agent liên quan"]
+    B --> C["agent chạy script local<br/>(vd firewall-drop.sh)<br/>với quyền thường là root/admin"]
+    C --> D["action được log lại;<br/>có thể auto-revert sau &lt;timeout&gt;,<br/>hoặc escalate nếu 'repeated offenders'<br/>(vi phạm lặp lại) — block lâu hơn<br/>theo cấp số nhân"]
 ```
 
 ## Config gotchas

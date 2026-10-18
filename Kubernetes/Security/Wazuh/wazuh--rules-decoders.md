@@ -14,21 +14,12 @@ Log thô từ 50 loại nguồn khác nhau (sshd, nginx, Windows Event Log, app 
 
 ## How it works (flow/diagram)
 
-```
-raw log line
-     │
-     ▼
-decoder cha (xác định "hình dạng" log, vd prefix "sshd:")
-     │
-     ▼
-decoder con (trích thêm field: srcip, user, port...)
-     │
-     ▼
-rule engine — match field/regex, có thể chain qua if_sid
-  (rule B chỉ fire nếu rule A vừa fire trong X giây → correlation)
-     │
-     ▼
-alert (level 0–16, level 0 = never alert / silence)
+```mermaid
+flowchart TD
+    A["raw log line"] --> B["decoder cha<br/>(xác định 'hình dạng' log,<br/>vd prefix 'sshd:')"]
+    B --> C["decoder con<br/>(trích thêm field:<br/>srcip, user, port...)"]
+    C --> D["rule engine — match field/regex,<br/>có thể chain qua if_sid<br/>(rule B chỉ fire nếu rule A vừa fire<br/>trong X giây → correlation)"]
+    D --> E["alert<br/>(level 0–16, level 0 = never alert / silence)"]
 ```
 
 ## Config gotchas

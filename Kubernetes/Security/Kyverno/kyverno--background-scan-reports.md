@@ -25,23 +25,19 @@ Không phải lúc nào enforce ngay cũng khả thi — cluster đang chạy pr
 
 ## How it works (flow/diagram)
 
-```
-Policy có background:true, failureAction/validationFailureAction: Enforce
-        │
-        ├── Request mới (admission-time) ──▶ chặn ngay nếu vi phạm (đúng nghĩa Enforce)
-        │                                     + ghi AdmissionReport
-        │
-        └── Resource CŨ đã tồn tại trước ──▶ Background Controller quét mỗi 1h (default)
-             khi policy được tạo                  │
-                                                   ▼
-                                         vi phạm → BackgroundScanReport
-                                         (KHÔNG bị block/xoá, vẫn chạy bình thường)
-                                                   │
-                                                   ▼
-                              Reports Controller gộp AdmissionReport + BackgroundScanReport
-                                                   │
-                                                   ▼
-                                    PolicyReport / ClusterPolicyReport (final, để xem/alert)
+```mermaid
+flowchart TD
+    Start["Policy có background:true,<br/>failureAction/validationFailureAction: Enforce"] --> B1["Request mới (admission-time)"]
+    Start --> B2["Resource CŨ đã tồn tại trước<br/>khi policy được tạo"]
+
+    B1 --> B1a["Chặn ngay nếu vi phạm<br/>(đúng nghĩa Enforce)<br/>+ ghi AdmissionReport"]
+
+    B2 --> B2a["Background Controller<br/>quét mỗi 1h (default)"]
+    B2a --> B2b["Vi phạm → BackgroundScanReport<br/>(KHÔNG bị block/xoá, vẫn chạy bình thường)"]
+
+    B1a --> Merge["Reports Controller gộp<br/>AdmissionReport + BackgroundScanReport"]
+    B2b --> Merge
+    Merge --> Final["PolicyReport / ClusterPolicyReport<br/>(final, để xem/alert)"]
 ```
 
 ## Config gotchas

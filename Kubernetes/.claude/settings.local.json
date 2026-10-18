@@ -7,7 +7,46 @@
       "Bash(grep -c '^```' '/Users/nghia/Library/CloudStorage/GoogleDrive-t.nghia2605@gmail.com/Other computers/My MacBook Air/GoogleDrive/my-note/Kubernetes/CKS-KodeKloud/Cluster Setup and Hardening.md')",
       "WebSearch",
       "WebFetch(domain:cluster-api.sigs.k8s.io)",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "Bash(python3 -)",
+      "Bash(mkdir *)",
+      "Artifact",
+      "Bash(d2 --version)",
+      "Bash(command -v npx)",
+      "Bash(d2 apparmor-arch.d2 apparmor-arch.svg)",
+      "Bash(d2 wazuh-arch.d2 wazuh-arch.svg)"
+    ]
+  },
+  "autoMode": {
+    "allow": [
+      "$defaults",
+      "Fetch public reference docs: curl or WebFetch GET from github.com, api.github.com, raw.githubusercontent.com"
+    ],
+    "environment": [
+      "### Org-wide",
+      "**Organization**: None configured — personal account (github.com/Tn9hia)",
+      "**Cloud provider(s)**: None configured — notes vault, no cloud infra touched",
+      "**Repository visibility**: Personal knowledge base at github.com/Tn9hia/technotes; a shareable study vault, so treat any push as potentially public",
+      "**Internal sharing / snippet hosting**: None configured — treat public paste/gist services as outside the trust boundary",
+      "**Secrets management**: None configured — no credentials handled in this repo",
+      "**Default / protected branches**: main is the working branch; direct push to origin/main is the normal workflow here",
+      "**CI/CD deploy targets**: None configured — no CI; pushing just updates the GitHub mirror",
+      "**Network posture**: Open internet; only public GitHub doc fetches observed",
+      "**Source control**: github.com/Tn9hia/technotes and its origin remote",
+      "**Trusted internal domains**: None configured",
+      "**Trusted cloud buckets**: None configured",
+      "**Key internal services**: None configured",
+      "**Internal package registry**: None configured",
+      "**Sensitive data locations & audiences**: any file or store holding personal data, confidential business data, credentials, regulated data, or similarly sensitive material; preserve exact handles when known and share only with the audiences the user named. (This repo is study notes; Fundamentals/Security/Secret.md is a note about Kubernetes Secrets, not an actual secret.)",
+      "**Data retention / declassification**: None configured",
+      "**Sensitive remote targets**: any namespace, host, or container whose name carries prod or production as a whole word or name segment (hyphen/underscore/dot-delimited — e.g. matches prod-db, not producer)",
+      "**Protected deployment namespaces / environments**: None configured — fall back to the Sensitive remote targets heuristic",
+      "**Protected IaC scopes**: IAM, RBAC, networking, quota, and node-pool resources; anything whose name or tag carries prod or production as a whole word or name segment",
+      "### User-specific",
+      "**Primary use of Claude Code**: writing and maintaining a Vietnamese Obsidian knowledge base about Kubernetes, CKS/CKA, and security (research + note authoring)",
+      "**Trusted repo**: github.com/Tn9hia/technotes (the my-note/Kubernetes vault) and its origin remote",
+      "**Org-specific CLIs**: None configured — recent sessions used only cd, curl, ls, jq, diff",
+      "**Routine web fetches**: fetching public reference docs via curl/WebFetch from github.com, api.github.com, raw.githubusercontent.com (research while writing notes)"
     ]
   }
 }

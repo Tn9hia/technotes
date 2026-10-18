@@ -24,27 +24,24 @@ Khi scan cluster, Trivy phân biệt 3 tầng: **cluster infrastructure** (contr
 
 ## How it works (flow/diagram)
 
+```mermaid
+flowchart TD
+    Start["trivy k8s [flags] [CONTEXT]"] --> B1["Không có CONTEXT →<br/>dùng cluster default trong kubeconfig"]
+    Start --> B2["RBAC: cần 'list' trên<br/>core/apps/batch/networking.k8s.io/<br/>rbac.authorization.k8s.io"]
+    Start --> B3["(mặc định) tải image từng workload<br/>để scan vuln/secret"]
+    B3 --> B3a["--skip-images để tắt<br/>(chỉ scan resource definition, nhanh hơn)"]
+    Start --> B4["(mặc định) chạy Node-Collector job<br/>trên mỗi node"]
+    B4 --> B4a["thu thập config phục vụ<br/>CIS Benchmark / infra assessment"]
+    B4 --> B4b["--disable-node-collector để tắt"]
+    Start --> B5["Output: --report summary (mặc định, gọn)<br/>hoặc --report all (chi tiết từng resource)"]
 ```
-trivy k8s [flags] [CONTEXT]
-        │
-        ├─ Không có CONTEXT → dùng cluster default trong kubeconfig
-        ├─ RBAC: cần "list" trên core/apps/batch/networking.k8s.io/rbac.authorization.k8s.io
-        ├─ (mặc định) tải image từng workload để scan vuln/secret
-        │       └─ --skip-images để tắt (chỉ scan resource definition, nhanh hơn nhiều)
-        ├─ (mặc định) chạy Node-Collector job trên mỗi node
-        │       └─ thu thập config phục vụ CIS Benchmark / infra assessment
-        │       └─ --disable-node-collector để tắt
-        └─ Output: --report summary (mặc định, gọn) hoặc --report all (chi tiết từng resource)
 
-
-Trivy Operator (trong cluster)
-        │
-        ├─ Watch Pod/Deployment/... events qua K8s API
-        ├─ Tạo Scan Job (giống node-collector nhưng cho workload scan)
-        ├─ Ghi kết quả thành CRD: VulnerabilityReport, ConfigAuditReport,
-        │   ExposedSecretReport, RbacAssessmentReport, InfraAssessmentReport,
-        │   ClusterComplianceReport (NSA/CISA, CIS Benchmark), SbomReport
-        └─ kubectl get vulnerabilityreports -A   ← query như mọi K8s resource khác
+```mermaid
+flowchart TD
+    Op["Trivy Operator (trong cluster)"] --> O1["Watch Pod/Deployment/...<br/>events qua K8s API"]
+    O1 --> O2["Tạo Scan Job<br/>(giống node-collector nhưng<br/>cho workload scan)"]
+    O2 --> O3["Ghi kết quả thành CRD:<br/>VulnerabilityReport, ConfigAuditReport,<br/>ExposedSecretReport, RbacAssessmentReport,<br/>InfraAssessmentReport, ClusterComplianceReport<br/>(NSA/CISA, CIS Benchmark), SbomReport"]
+    O3 --> O4["kubectl get vulnerabilityreports -A<br/>← query như mọi K8s resource khác"]
 ```
 
 ## Config gotchas

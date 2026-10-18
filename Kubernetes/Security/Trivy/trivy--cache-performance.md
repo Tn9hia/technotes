@@ -20,24 +20,18 @@ Mỗi loại target có đặc điểm khác nhau: scan image lặp lại nhiề
 
 ## How it works (flow/diagram)
 
-```
-trivy image myimage   (mặc định --cache-backend fs)
-        │
-        ▼
-BoltDB file lock trên --cache-dir
-        │
-        ├─ Process A đang giữ lock ──▶ Process B chạy cùng --cache-dir cùng lúc
-        │                              → BLOCK/HANG chờ A nhả lock, không phải lỗi crash
-        │
-        └─ A xong, nhả lock ──▶ B tiếp tục bình thường
+```mermaid
+flowchart TD
+    A["trivy image myimage<br/>(mặc định --cache-backend fs)"] --> B["BoltDB file lock<br/>trên --cache-dir"]
+    B --> C{"Process khác đang<br/>giữ lock?"}
+    C -->|"Có (Process A giữ)"| D["Process B chạy cùng --cache-dir<br/>cùng lúc → BLOCK/HANG chờ A<br/>nhả lock, không phải lỗi crash"]
+    C -->|"A xong, nhả lock"| E["B tiếp tục bình thường"]
 ```
 
-```
-trivy server --cache-backend redis://localhost:6379
-        │
-        ▼
-Nhiều client (trivy image --server http://...) dùng chung DB trên Redis
-        → không lo file-lock, nhưng cần Redis sẵn sàng + network ổn định
+```mermaid
+flowchart TD
+    A["trivy server --cache-backend redis://localhost:6379"] --> B["Nhiều client<br/>(trivy image --server http://...)<br/>dùng chung DB trên Redis"]
+    B --> C["Không lo file-lock,<br/>nhưng cần Redis sẵn sàng<br/>+ network ổn định"]
 ```
 
 ## Config gotchas

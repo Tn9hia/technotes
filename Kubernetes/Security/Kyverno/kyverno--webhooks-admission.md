@@ -14,14 +14,31 @@ Kyverno Admission Controller đăng ký (và tự quản lý qua Webhook Control
 
 ## How it works (flow/diagram)
 
-```
-kubectl apply Pod ──▶ apiserver ──▶ [MutatingWebhook: kyverno] ──▶ [ValidatingWebhook: kyverno] ──▶ etcd
-                                          │  timeout: 10s default (1-30s range)         │
-                                          │  failurePolicy: Fail (default)              │
-                                          ▼                                              ▼
-                                   nếu Kyverno pod không phản hồi kịp trong timeoutSeconds:
-                                   - failurePolicy=Fail   → apiserver TỪ CHỐI request (fail-closed)
-                                   - failurePolicy=Ignore → apiserver CHO QUA request (fail-open)
+```mermaid
+sequenceDiagram
+    participant kubectl
+    participant apiserver
+    participant Mutating as MutatingWebhook: kyverno
+    participant Validating as ValidatingWebhook: kyverno
+    participant etcd
+
+    kubectl->>apiserver: apply Pod
+    apiserver->>Mutating: AdmissionReview<br/>(timeout 10s default, 1-30s range)
+
+    alt Kyverno phản hồi kịp
+        Mutating-->>apiserver: OK (mutated)
+        apiserver->>Validating: AdmissionReview
+        Validating-->>apiserver: OK
+        apiserver->>etcd: ghi object
+    else Kyverno pod không phản hồi kịp trong timeoutSeconds
+        alt failurePolicy: Fail (default)
+            Mutating--xapiserver: timeout
+            apiserver--xkubectl: TỪ CHỐI request (fail-closed)
+        else failurePolicy: Ignore
+            Mutating--xapiserver: timeout
+            apiserver->>etcd: CHO QUA request (fail-open)
+        end
+    end
 ```
 
 ## Config gotchas

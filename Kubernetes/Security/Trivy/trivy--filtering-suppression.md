@@ -8,8 +8,11 @@ Tags: #trivy #filtering #ignore #vex #ci-cd
 
 Trivy filter kết quả qua 1 pipeline nhiều tầng theo thứ tự cố định:
 
-```
-Detected Issues → [Prioritization: Severity → Status] → [Suppression: Finding ID → Rego → VEX] → Results
+```mermaid
+flowchart TD
+    A["Detected Issues"] --> B["Prioritization:<br/>Severity → Status"]
+    B --> C["Suppression:<br/>Finding ID → Rego → VEX"]
+    C --> D["Results"]
 ```
 
 - **Prioritization** (thu hẹp theo mức độ): `--severity`, `--ignore-status`/`--ignore-unfixed`.
@@ -22,22 +25,25 @@ Không phải tổ chức nào cũng cần block mọi CVE tìm được — có
 
 ## How it works (flow/diagram)
 
+```bash
+trivy image --severity HIGH,CRITICAL \
+            --ignore-unfixed \
+            --ignorefile .trivyignore.yaml \
+            --ignore-policy policy.rego \
+            --vex repo \
+            --exit-code 1 \
+            myimage:tag
 ```
-$ trivy image --severity HIGH,CRITICAL \
-              --ignore-unfixed \
-              --ignorefile .trivyignore.yaml \
-              --ignore-policy policy.rego \
-              --vex repo \
-              --exit-code 1 \
-              myimage:tag
 
-1. Detect toàn bộ vuln/misconfig/secret/license
-2. Lọc severity: chỉ giữ HIGH/CRITICAL
-3. Lọc status: --ignore-unfixed = ẩn affected/will_not_fix/fix_deferred/end_of_life
-4. Loại theo Finding ID: match CVE-ID/AVD-ID/license-name trong .trivyignore.yaml
-5. Loại theo Rego: evaluate package `trivy`, rule `ignore` (input = từng finding JSON)
-6. Loại theo VEX: statement not_affected/false_positive từ VEX document
-7. Kết quả cuối → nếu còn finding thoả điều kiện → exit code 1 (nếu set)
+```mermaid
+flowchart TD
+    S1["1. Detect toàn bộ<br/>vuln/misconfig/secret/license"] --> S2
+    S2["2. Lọc severity:<br/>chỉ giữ HIGH/CRITICAL"] --> S3
+    S3["3. Lọc status: --ignore-unfixed =<br/>ẩn affected/will_not_fix/<br/>fix_deferred/end_of_life"] --> S4
+    S4["4. Loại theo Finding ID:<br/>match CVE-ID/AVD-ID/license-name<br/>trong .trivyignore.yaml"] --> S5
+    S5["5. Loại theo Rego:<br/>evaluate package `trivy`, rule `ignore`<br/>(input = từng finding JSON)"] --> S6
+    S6["6. Loại theo VEX:<br/>statement not_affected/false_positive<br/>từ VEX document"] --> S7
+    S7["7. Kết quả cuối → nếu còn finding<br/>thoả điều kiện → exit code 1 (nếu set)"]
 ```
 
 ## Config gotchas

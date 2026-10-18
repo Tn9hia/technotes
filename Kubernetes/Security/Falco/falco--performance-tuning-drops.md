@@ -14,21 +14,12 @@ Bắt mọi syscall trên node có traffic cao (build server, batch job, network
 
 ## How it works (flow/diagram)
 
-```
-Syscall xảy ra liên tục
-        │
-        ▼
-┌─────────────────────────┐
-│ Ring buffer (per-CPU)     │  ← kích thước cố định (config được)
-│ [event][event][event]...  │
-└──────────┬───────────────┘
-           │ Falco userspace đọc buffer theo tốc độ xử lý được
-           ▼
-   Buffer đầy? ──Có──▶ DROP event mới (n_drops tăng) — KHÔNG block syscall gốc
-           │
-          Không
-           ▼
-   Enrich + evaluate rule → alert (nếu match)
+```mermaid
+flowchart TD
+    A["Syscall xảy ra liên tục"] --> B["Ring buffer (per-CPU)<br/>kích thước cố định (config được)<br/>[event][event][event]..."]
+    B -->|"Falco userspace đọc buffer<br/>theo tốc độ xử lý được"| C{"Buffer đầy?"}
+    C -->|Có| D["DROP event mới<br/>(n_drops tăng)<br/>KHÔNG block syscall gốc"]
+    C -->|Không| E["Enrich + evaluate rule<br/>→ alert (nếu match)"]
 ```
 
 Điểm mấu chốt: **drop xảy ra TRƯỚC khi rule engine kịp nhìn thấy event** — nghĩa là nếu syscall attacker gây ra đúng lúc buffer đầy, **không rule nào có thể bắt được nó**, vì đơn giản là Falco chưa từng thấy event đó. Đây khác hẳn với "rule không match" (event có được thấy nhưng không match condition nào).

@@ -29,27 +29,20 @@ Nếu không có nó: mỗi server tự log ra file riêng, không ai correlate 
 
 ### **4. Where - Architecture — Nó nằm ở đâu trong hệ thống?**
 
-```
-┌──────────────┐      1514/tcp (encrypted)      ┌────────────────────────────┐
-│ Wazuh Agent  │ ─────────────────────────────▶ │        Wazuh Manager        │
-│ (endpoint)   │ ◀───────────────────────────── │  remoted → analysisd →      │
-│ Linux/Win/Mac│      1515/tcp (enrollment)      │  (decoder+rule engine)      │
-└──────────────┘                                 │  → alerts.json / archives   │
-                                                  └──────────────┬─────────────┘
-                                                                 │ Filebeat ships
-                                                                 ▼
-                                                  ┌────────────────────────────┐
-                                                  │      Wazuh Indexer          │
-                                                  │  (OpenSearch fork, 9200)    │
-                                                  └──────────────┬─────────────┘
-                                                                 │
-                                                                 ▼
-                                                  ┌────────────────────────────┐
-                                                  │     Wazuh Dashboard         │
-                                                  │ (OpenSearch Dashboards, 443)│
-                                                  └────────────────────────────┘
+```d2
+direction: right
 
-                    Wazuh API (55000/tcp) ── quản lý agent, rule, cluster qua REST
+agent: "Wazuh Agent\n(endpoint)\nLinux / Win / Mac"
+manager: "Wazuh Manager\nremoted → analysisd →\n(decoder + rule engine)\n→ alerts.json / archives"
+indexer: "Wazuh Indexer\n(OpenSearch fork, 9200)"
+dashboard: "Wazuh Dashboard\n(OpenSearch Dashboards, 443)"
+api: "Wazuh API (55000/tcp)\nquản lý agent, rule, cluster qua REST"
+
+agent -> manager: "1514/tcp (encrypted)"
+manager -> agent: "1515/tcp (enrollment)"
+manager -> indexer: "Filebeat ships"
+indexer -> dashboard
+api -> manager: "REST"
 ```
 
 - **Vị trí trong hệ thống:** ngồi ngoài band, không inline traffic — agent đọc log/local state, gửi metadata về manager, không chặn traffic (trừ active response chủ động thực thi lệnh trên host).

@@ -14,13 +14,15 @@ Nếu Sentry tự mở file trên host trực tiếp, nó sẽ cần quyền hos
 
 ## How it works (flow/diagram)
 
-```
-App (Sentry) --syscall filesystem--> Sentry logic (VFS nội bộ)
-                                          │
-                          directfs=true?  │  directfs=false?
-                          (donate FD)     │  (RPC mọi lần)
-                                          ▼
-                                       Gofer  <--LISAFS--> host filesystem thật
+```mermaid
+flowchart TD
+    App["App (Sentry)<br/>syscall filesystem"] --> Logic["Sentry logic (VFS nội bộ)"]
+    Logic --> Decision{"directfs?"}
+    Decision -->|"true (donate FD)"| Direct["Sandbox tự gọi openat/fchownat...<br/>trực tiếp trên FD đã donate"]
+    Decision -->|"false (RPC mọi lần)"| RPC["RPC tới Gofer mỗi lần I/O"]
+    Direct --> Gofer["Gofer"]
+    RPC --> Gofer
+    Gofer <-->|"LISAFS"| HostFS["host filesystem thật"]
 ```
 
 - **Directfs (default: bật)**: Gofer donate FD của toàn bộ mount point cho sandbox 1 lần, sandbox sau đó tự gọi `openat(2)`, `fchownat(2)`... trực tiếp trên FD đó — **bỏ qua round-trip RPC tới Gofer** mỗi lần I/O → nhanh hơn nhiều. Sandbox vẫn chỉ thao tác được trên cây filesystem mà Gofer đã expose, không đụng được gì khác trên host. Có thêm ràng buộc security: enforce `O_NOFOLLOW` qua seccomp, đảm bảo không leak FD khi khởi động.

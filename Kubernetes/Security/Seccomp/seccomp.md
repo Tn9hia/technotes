@@ -32,43 +32,50 @@ Seccomp thu hẹp attack surface đó lại: container chỉ có ~300-350 syscal
 
 ### **4. Where - Architecture — Nó nằm ở đâu trong hệ thống?**
 
-```
-User process (container)
-      │  gọi syscall (ví dụ open(), mount())
-      ▼
-┌─────────────────────────────┐
-│  Kernel syscall entry        │
-│  ┌─────────────────────────┐ │
-│  │ Seccomp-BPF filter chain │ │ ← attach qua prctl()/seccomp() syscall
-│  │ (đánh giá theo thứ tự    │ │
-│  │  filter cuối cùng gắn    │ │
-│  │  trước, ưu tiên action   │ │
-│  │  nghiêm khắc nhất thắng) │ │
-│  └─────────────────────────┘ │
-│         │ action             │
-│  ALLOW ─┼─ ERRNO/KILL/TRAP/  │
-│         │  LOG/TRACE/NOTIFY  │
-└─────────┼─────────────────────┘
-          ▼
-  Syscall thực thi (nếu ALLOW/LOG) hoặc bị chặn
+```d2
+direction: down
+
+process: "User process (container)"
+
+process -> kernel.filter: "gọi syscall\n(open(), mount()...)"
+
+kernel: "Kernel syscall entry" {
+  filter: "Seccomp-BPF filter chain"
+  note: "attach qua prctl()/seccomp();\nfilter gắn SAU được đánh giá TRƯỚC;\naction nghiêm khắc nhất luôn thắng" {
+    shape: text
+  }
+}
+
+kernel.filter -> action: "action"
+
+action: "ALLOW | ERRNO | KILL | TRAP | LOG | TRACE | NOTIFY" {
+  shape: diamond
+}
+
+action -> allow: "ALLOW / LOG"
+action -> blocked: "ERRNO / KILL / TRAP"
+
+allow: "Syscall thực thi"
+blocked: "Syscall bị chặn"
 ```
 
 **Vị trí trong container stack:**
 
-```
-Pod spec (securityContext.seccompProfile)
-        │
-        ▼
-kubelet ──► CRI (containerd / CRI-O)
-        │        │
-        │        ▼
-        │   OCI runtime spec (config.json → linux.seccomp)
-        │        │
-        │        ▼
-        │   runc / crun (dùng libseccomp để compile JSON → BPF program)
-        │        │
-        │        ▼
-        └──►  prctl(PR_SET_SECCOMP) / seccomp(2) trước khi exec() container process
+```d2
+direction: down
+
+pod: "Pod spec\n(securityContext.seccompProfile)"
+kubelet: "kubelet"
+cri: "CRI\n(containerd / CRI-O)"
+oci: "OCI runtime spec\n(config.json → linux.seccomp)"
+runtime: "runc / crun\n(libseccomp compile JSON → BPF)"
+load: "prctl(PR_SET_SECCOMP) / seccomp(2)\ntrước khi execve() container process"
+
+pod -> kubelet
+kubelet -> cri
+cri -> oci
+oci -> runtime
+runtime -> load
 ```
 
 **Dependency:** kernel `CONFIG_SECCOMP` + `CONFIG_SECCOMP_FILTER` (bật mặc định trên hầu hết distro production hiện đại), `libseccomp` (thư viện userspace mà runc/crun/Docker/CRI-O dùng để build BPF filter từ JSON profile).

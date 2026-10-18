@@ -30,33 +30,23 @@ Kyverno lấp khoảng trống: validate + mutate + **generate** (tự sinh reso
 
 ### **4. Where - Architecture — Nó nằm ở đâu trong hệ thống?**
 
-```
-                          ┌─────────────────────────┐
-   kubectl apply  ─────▶ │   kube-apiserver          │
-                          │  (admission chain)        │
-                          └──────────┬────────────────┘
-                       MutatingWebhook│  ValidatingWebhook
-                          (kyverno-svc:443, AdmissionReview, timeout mặc định 10s)
-                                     ▼
-                     ┌───────────────────────────────┐
-                     │   Admission Controller (Pod)   │◀── KHÔNG có leader election
-                     │   - webhook controller         │    cho webhook traffic
-                     │   - cert renewer                │    (mọi replica đều serve
-                     │   - engine (validate/mutate)    │     song song → scale ngang
-                     └───────────────┬───────────────┘     tăng throughput thật)
-                                     │ ghi AdmissionReport /
-                                     │ UpdateRequest (generate, mutate-existing)
-        ┌────────────────────────────┼─────────────────────────────┐
-        ▼                            ▼                              ▼
-┌───────────────────┐   ┌────────────────────────┐    ┌───────────────────────┐
-│ Background         │   │ Reports Controller      │    │ Cleanup Controller     │
-│ Controller         │   │ (có leader election →   │    │ (có leader election    │
-│ (có leader election)│  │  chỉ 1 replica active)  │    │  cho webhook/cert;     │
-│ xử lý generate/     │   │ gộp AdmissionReport +   │    │  là controller duy    │
-│ mutate-existing +   │   │ BackgroundScanReport    │    │  nhất khác Admission  │
-│ background scan    │   │ → PolicyReport /         │    │  Controller tự quản   │
-│ (mặc định mỗi 1h)  │   │   ClusterPolicyReport    │    │  webhook riêng)        │
-└───────────────────┘   └────────────────────────┘    └───────────────────────┘
+```d2
+direction: down
+
+kubectl: "kubectl apply"
+apiserver: "kube-apiserver\n(admission chain)"
+
+admission: "Admission Controller (Pod)\n- webhook controller\n- cert renewer\n- engine (validate/mutate)\nKHÔNG có leader election cho webhook traffic\n(mọi replica đều serve song song →\nscale ngang tăng throughput thật)"
+
+background: "Background Controller\n(có leader election)\nxử lý generate/mutate-existing +\nbackground scan (mặc định mỗi 1h)"
+reports: "Reports Controller\n(có leader election →\nchỉ 1 replica active)\ngộp AdmissionReport + BackgroundScanReport\n→ PolicyReport / ClusterPolicyReport"
+cleanup: "Cleanup Controller\n(có leader election cho webhook/cert;\nlà controller duy nhất khác Admission\nController tự quản webhook riêng)"
+
+kubectl -> apiserver
+apiserver -> admission: "MutatingWebhook / ValidatingWebhook\n(kyverno-svc:443, AdmissionReview,\ntimeout mặc định 10s)"
+admission -> background: "ghi AdmissionReport /\nUpdateRequest (generate, mutate-existing)"
+admission -> reports
+admission -> cleanup
 ```
 
 Chi tiết controller + HA sizing → [[kyverno--architecture-controllers]]

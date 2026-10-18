@@ -33,37 +33,35 @@ Trivy (Aqua Security, CNCF project) là **all-in-one security scanner**: 1 binar
 
 ### **4. Where - Architecture — Nó nằm ở đâu trong hệ thống?**
 
+```d2
+direction: down
+
+registries: "External OCI Registries\n(mirror.gcr.io ưu tiên, fallback ghcr.io)" {
+  db: "trivy-db\n(vuln DB, schema v2)"
+  javadb: "trivy-java-db\n(Java index, schema v1)"
+  checks: "trivy-checks\n(misconfig policy bundle)"
+}
+
+target: "Scan Target\n- Image\n- Filesystem\n- Git repo\n- VM image\n- SBOM file\n- K8s cluster"
+
+engine: "Trivy Engine" {
+  vuln: "Vuln Scanner"
+  misconfig: "Misconfig Scanner (Rego)"
+  secret: "Secret / License"
+  cache: "Local cache\n(BoltDB / memory / Redis)"
+}
+
+output: "Output: table / json / sarif /\ncyclonedx / spdx / template"
+
+sink: "CI/CD gate, SIEM, hoặc Kubernetes CRD\n(trivy-operator → VulnerabilityReport,\nConfigAuditReport, ExposedSecretReport...)"
+
+registries -> engine: "pull khi cần (cache theo TTL)"
+target -> engine
+engine -> output: "filter theo severity/status/ignore"
+output -> sink
 ```
-                              ┌─────────────────────────────────────────────┐
-                              │         External OCI Registries              │
-                              │  (mirror.gcr.io ưu tiên, fallback ghcr.io)   │
-                              │  - trivy-db (vuln DB, schema v2)             │
-                              │  - trivy-java-db (Java index, schema v1)     │
-                              │  - trivy-checks (misconfig policy bundle)    │
-                              └───────────────────┬───────────────────────────┘
-                                                  │ pull khi cần (cache theo TTL)
-                                                  ▼
-   ┌──────────────┐   ┌──────────────────────────────────────────────────┐
-   │  Scan Target  │──▶│                  Trivy Engine                    │
-   │ - Image       │   │  ┌────────────┐ ┌───────────────┐ ┌───────────┐ │
-   │ - Filesystem  │   │  │ Vuln        │ │ Misconfig      │ │ Secret /  │ │
-   │ - Git repo    │   │  │ Scanner     │ │ Scanner (Rego) │ │ License   │ │  → [[trivy--scanners]]
-   │ - VM image    │   │  └────────────┘ └───────────────┘ └───────────┘ │
-   │ - SBOM file   │   │              Local cache (BoltDB/memory/Redis)   │  → [[trivy--cache-performance]]
-   │ - K8s cluster │   └───────────────────┬──────────────────────────────┘
-   └──────────────┘                       │ filter theo severity/status/ignore  → [[trivy--filtering-suppression]]
-                                           ▼
-                              ┌────────────────────────────┐
-                              │ Output: table/json/sarif/   │
-                              │ cyclonedx/spdx/template      │
-                              └───────────────┬────────────┘
-                                              ▼
-                     ┌───────────────────────────────────────────┐
-                     │  CI/CD gate, SIEM, hoặc Kubernetes CRD      │
-                     │  (trivy-operator → VulnerabilityReport,      │  → [[trivy--kubernetes-scanning]]
-                     │  ConfigAuditReport, ExposedSecretReport...)  │
-                     └───────────────────────────────────────────┘
-```
+
+Chi tiết từng phần: Scanner engine → [[trivy--scanners]] · Local cache → [[trivy--cache-performance]] · Filter severity/status/ignore → [[trivy--filtering-suppression]] · CI/CD gate / Kubernetes CRD → [[trivy--kubernetes-scanning]]
 
 - **Vị trí trong hệ thống**: có thể chạy như CLI đơn lẻ trong CI/CD runner, như `trivy server` (client/server mode, dùng chung DB cho nhiều client), hoặc như **Kubernetes Operator** (DaemonSet/Deployment chạy thường trực trong cluster, tự trigger scan khi có Pod mới).
 - **Component chính**: scan target adapter (đọc image layer / filesystem / git repo) → 4 scanner engine (vuln, misconfig, secret, license) → local cache (DB + kết quả scan trước) → report formatter.

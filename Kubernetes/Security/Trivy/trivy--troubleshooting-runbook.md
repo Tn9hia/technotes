@@ -14,23 +14,14 @@ Trivy chạy trong rất nhiều môi trường khác nhau (CI runner, air-gappe
 
 ## How it works (flow/diagram)
 
-```
-Gặp lỗi
-  │
-  ├─ Liên quan "unable to initialize a scanner" / không tìm thấy image
-  │     → kiểm tra Docker/containerd/podman socket, hoặc registry auth/proxy
-  │
-  ├─ Liên quan "download vulnerability DB" / "DENIED" / rate limit
-  │     → network tới mirror.gcr.io/ghcr.io, hoặc GHCR token hết hạn
-  │
-  ├─ Liên quan "cache may be in use" / "layer cache missing"
-  │     → BoltDB file-lock (chạy song song) hoặc thiếu Redis khi multi-server
-  │
-  ├─ Liên quan "timeout" / "no space left on device" / "/tmp"
-  │     → tài nguyên (thời gian, disk, TMPDIR) không đủ cho image lớn/Java
-  │
-  └─ Liên quan Maven/Java 429
-        → rate limit từ Maven Central, không phải lỗi Trivy
+```mermaid
+flowchart TD
+    Start["Gặp lỗi"] --> Kind{"Liên quan gì?"}
+    Kind -->|"unable to initialize a scanner /<br/>không tìm thấy image"| F1["Kiểm tra Docker/containerd/podman socket,<br/>hoặc registry auth/proxy"]
+    Kind -->|"download vulnerability DB /<br/>DENIED / rate limit"| F2["Network tới mirror.gcr.io/ghcr.io,<br/>hoặc GHCR token hết hạn"]
+    Kind -->|"cache may be in use /<br/>layer cache missing"| F3["BoltDB file-lock (chạy song song)<br/>hoặc thiếu Redis khi multi-server"]
+    Kind -->|"timeout / no space left<br/>on device / /tmp"| F4["Tài nguyên (thời gian, disk, TMPDIR)<br/>không đủ cho image lớn/Java"]
+    Kind -->|"Maven/Java 429"| F5["Rate limit từ Maven Central,<br/>không phải lỗi Trivy"]
 ```
 
 ## Config gotchas — Bảng tra nhanh

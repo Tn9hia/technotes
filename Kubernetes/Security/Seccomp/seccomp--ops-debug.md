@@ -16,26 +16,14 @@ Viết seccomp profile "từ trí nhớ" (đoán app cần syscall gì) gần nh
 
 ## Quy trình chuẩn build 1 fine-grained profile
 
-```
-1. Chạy app với profile "audit" (defaultAction: SCMP_ACT_LOG)
-        │  → mọi syscall được LOG, KHÔNG bị chặn, app chạy bình thường
-        ▼
-2. Chạy app qua đầy đủ kịch bản thực tế (happy path + error path +
-   restart + signal/graceful shutdown + healthcheck)
-        │
-        ▼
-3. Thu thập log (xem mục Debug bên dưới), rút ra tập syscall duy nhất
-        │
-        ▼
-4. Viết fine-grained profile: defaultAction=SCMP_ACT_ERRNO + allowlist
-   = tập syscall thu được (+ biên độ an toàn nhỏ nếu chưa chắc)
-        │
-        ▼
-5. Chạy lại app với profile "violation" chặn hết → xác nhận app THẬT SỰ
-   crash (sanity check là profile có tác dụng, không phải audit sai chỗ)
-        │
-        ▼
-6. Deploy fine-grained profile, canary trên 1 subset trước khi rollout toàn cluster
+```mermaid
+flowchart TD
+    S1["1. Chạy app với profile audit<br/>(defaultAction: SCMP_ACT_LOG)"] -->|"mọi syscall được LOG,<br/>KHÔNG bị chặn, app chạy bình thường"| S2
+    S2["2. Chạy app qua đầy đủ kịch bản thực tế<br/>(happy path + error path + restart +<br/>signal/graceful shutdown + healthcheck)"] --> S3
+    S3["3. Thu thập log (xem mục Debug bên dưới),<br/>rút ra tập syscall duy nhất"] --> S4
+    S4["4. Viết fine-grained profile:<br/>defaultAction=SCMP_ACT_ERRNO + allowlist<br/>= tập syscall thu được (+ biên độ an toàn nhỏ nếu chưa chắc)"] --> S5
+    S5["5. Chạy lại app với profile violation chặn hết<br/>→ xác nhận app THẬT SỰ crash<br/>(sanity check, không phải audit sai chỗ)"] --> S6
+    S6["6. Deploy fine-grained profile,<br/>canary trên 1 subset trước khi<br/>rollout toàn cluster"]
 ```
 
 ## Debug — công cụ theo lớp

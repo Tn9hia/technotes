@@ -20,19 +20,14 @@ Falcoctl tồn tại vì quản lý version rule + plugin thủ công (tải fil
 
 ## How it works (flow/diagram)
 
-```
-falcoctl index add <name> <url>      # thêm nguồn index (danh sách artifact khả dụng)
-falcoctl artifact install <ref>      # tải rule/plugin về, verify chữ ký (cosign)
-falcoctl artifact follow <ref>       # tự động theo dõi + cập nhật khi có version mới
-                    │
-                    ▼
-        OCI Registry (vd ghcr.io/falcosecurity/plugins/...)
-                    │
-                    ▼
-     Rule/Plugin file được đặt vào path Falco đọc (rules_files / plugins config)
-                    │
-                    ▼
-        Falco load lúc start (hoặc reload nếu hỗ trợ hot-reload)
+```mermaid
+flowchart TD
+    C1["falcoctl index add &lt;name&gt; &lt;url&gt;<br/>(thêm nguồn index)"] --> Registry
+    C2["falcoctl artifact install &lt;ref&gt;<br/>(tải rule/plugin, verify chữ ký cosign)"] --> Registry
+    C3["falcoctl artifact follow &lt;ref&gt;<br/>(tự động theo dõi + cập nhật)"] --> Registry
+
+    Registry["OCI Registry<br/>(vd ghcr.io/falcosecurity/plugins/...)"] --> Path["Rule/Plugin file được đặt vào path<br/>Falco đọc (rules_files / plugins config)"]
+    Path --> Load["Falco load lúc start<br/>(hoặc reload nếu hỗ trợ hot-reload)"]
 ```
 
 Plugin cần khai báo trong `falco.yaml`:

@@ -23,20 +23,19 @@ Mỗi loại rủi ro cần cơ chế phát hiện khác hẳn nhau: vuln cần 
 
 ## How it works (flow/diagram)
 
-```
---scanners vuln,misconfig,secret,license
-        │
-        ├─▶ Vuln:      detect OS (apk/dpkg/rpm) + lang files (go.sum, package-lock.json...)
-        │              → so khớp version với trivy-db → severity theo vendor-priority
-        │
-        ├─▶ Misconfig: parse Dockerfile/K8s YAML/Terraform/CloudFormation/Helm/Ansible
-        │              → evaluate Rego check (trivy-checks) → PASS/FAIL theo severity
-        │
-        ├─▶ Secret:    quét từng file plaintext theo regex rule (AWS key, GH token...)
-        │              → trừ layer/path nằm trong "base image" hoặc "allow rules"
-        │
-        └─▶ License:   đọc metadata license package (npm/pip/gem/apk...)
-                       → classify (Forbidden/Restricted/.../Unknown) → map ra severity
+```mermaid
+flowchart TD
+    Start["--scanners vuln,misconfig,secret,license"] --> Vuln["Vuln:<br/>detect OS (apk/dpkg/rpm) + lang files<br/>(go.sum, package-lock.json...)"]
+    Vuln --> VulnOut["so khớp version với trivy-db<br/>→ severity theo vendor-priority"]
+
+    Start --> Misconfig["Misconfig:<br/>parse Dockerfile/K8s YAML/Terraform/<br/>CloudFormation/Helm/Ansible"]
+    Misconfig --> MisconfigOut["evaluate Rego check (trivy-checks)<br/>→ PASS/FAIL theo severity"]
+
+    Start --> Secret["Secret:<br/>quét từng file plaintext theo regex rule<br/>(AWS key, GH token...)"]
+    Secret --> SecretOut["trừ layer/path nằm trong<br/>'base image' hoặc 'allow rules'"]
+
+    Start --> License["License:<br/>đọc metadata license package<br/>(npm/pip/gem/apk...)"]
+    License --> LicenseOut["classify (Forbidden/Restricted/.../Unknown)<br/>→ map ra severity"]
 ```
 
 Severity của **license** được Trivy tự map cứng: Forbidden→CRITICAL, Restricted→HIGH, Reciprocal→MEDIUM, Notice/Permissive/Unencumbered→LOW, Unknown→UNKNOWN. Không cấu hình lại mapping này được qua flag, chỉ filter theo severity output.

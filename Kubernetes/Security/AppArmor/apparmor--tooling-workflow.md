@@ -12,13 +12,14 @@ Viết profile tay cho app phức tạp (nginx, php-fpm, custom service) rất d
 
 ## How it works (flow)
 
-```
- 1. aa-genprof <bin>      → tạo profile rỗng, đặt complain mode, chờ user thao tác app thật
- 2. (thao tác mọi tính năng, mọi flow của app) → kernel log mọi hành vi bị chặn dù đang complain
- 3. aa-logprof             → đọc log, hỏi Allow/Deny/Glob cho từng dòng, ghi vào profile
- 4. lặp lại bước 2-3 tới khi hết sự kiện lạ phát sinh
- 5. aa-enforce <profile>   → chuyển sang production mode
- 6. theo dõi log DENIED thêm 1 thời gian → phát hiện case chưa cover hết
+```mermaid
+flowchart TD
+    S1["1. aa-genprof &lt;bin&gt;<br/>tạo profile rỗng, đặt complain mode,<br/>chờ user thao tác app thật"] --> S2
+    S2["2. Thao tác mọi tính năng, mọi flow của app<br/>→ kernel log mọi hành vi bị chặn dù đang complain"] --> S3
+    S3["3. aa-logprof<br/>đọc log, hỏi Allow/Deny/Glob<br/>cho từng dòng, ghi vào profile"] --> S4{"4. Hết sự kiện lạ<br/>phát sinh chưa?"}
+    S4 -->|Chưa| S2
+    S4 -->|Rồi| S5
+    S5["5. aa-enforce &lt;profile&gt;<br/>chuyển sang production mode"] --> S6["6. Theo dõi log DENIED thêm 1 thời gian<br/>→ phát hiện case chưa cover hết"]
 ```
 
 ### Bảng lệnh cốt lõi

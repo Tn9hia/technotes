@@ -31,45 +31,41 @@ Falco (CNCF Graduated project) là công cụ **runtime security / threat detect
 
 ### **4. Where - Architecture — Nó nằm ở đâu trong hệ thống?**
 
+```d2
+direction: down
+
+node: "Linux Node / K8s Node" {
+  a: "Container A"
+  b: "Container B"
+  host: "Host process"
+
+  driver: "Driver (chọn 1):\n- Kernel module (.ko)\n- Legacy eBPF probe\n- Modern eBPF (CO-RE, default)"
+
+  engine: "Falco Userspace Engine" {
+    libscap: "libscap (capture)"
+    libsinsp: "libsinsp (state / enrichment)"
+    rules: "Rule engine (YAML)"
+    plugins: "Plugin framework"
+  }
+
+  outputs: "Outputs: stdout / file / syslog /\ngRPC API / HTTP webhook"
+
+  a -> driver: "syscalls"
+  b -> driver: "syscalls"
+  host -> driver: "syscalls"
+
+  driver -> engine: "scap event\n(shared ring buffer)"
+  engine -> outputs: "enrich container/pod metadata\n(containerd/docker socket, k8s API)\nmatch rule → format alert"
+}
+
+sidekick: "Falcosidekick\n→ Slack / ES / S3 / SIEM / Loki..."
+talon: "falco-talon\n(response, optional — enforcement)"
+
+node.outputs -> sidekick
+sidekick -> talon
 ```
-┌─────────────────────────────── Linux Node / K8s Node ────────────────────────────────┐
-│                                                                                        │
-│  ┌────────────┐     syscalls      ┌──────────────────────────────┐                   │
-│  │ Container A │──────────────────▶│  Driver (chọn 1):             │                   │
-│  ├────────────┤                   │  - Kernel module (.ko)        │  → [[falco--drivers]]
-│  │ Container B │──────────────────▶│  - Legacy eBPF probe          │                   │
-│  ├────────────┤                   │  - Modern eBPF (CO-RE, default)│                   │
-│  │ Host process│──────────────────▶│                                │                   │
-│  └────────────┘                   └───────────────┬────────────────┘                   │
-│                                                    │ scap event (shared ring buffer)     │
-│                                                    ▼                                    │
-│                                   ┌────────────────────────────────┐                    │
-│                                   │  Falco Userspace Engine          │                    │
-│                                   │  - libscap (capture)             │                    │
-│                                   │  - libsinsp (state/enrichment)   │                    │
-│                                   │  - Rule engine (YAML)            │  → [[falco--rules-syntax]]
-│                                   │  - Plugin framework              │  → [[falco--falcoctl-plugins]]
-│                                   └───────────────┬────────────────┘                    │
-│                                                    │ enrich container/pod metadata        │
-│                                          (containerd/docker socket, k8s API)             │
-│                                                    │ match rule → format alert            │
-│                                                    ▼                                     │
-│                                   ┌────────────────────────────────┐                    │
-│                                   │  Outputs: stdout/file/syslog/    │  → [[falco--outputs-falcosidekick]]
-│                                   │  gRPC API / HTTP webhook         │                    │
-│                                   └───────────────┬────────────────┘                    │
-└────────────────────────────────────────────────────┼─────────────────────────────────────┘
-                                                       ▼
-                                     ┌────────────────────────────┐
-                                     │  Falcosidekick               │
-                                     │  → Slack/ES/S3/SIEM/Loki...  │
-                                     └──────────────┬─────────────┘
-                                                     ▼
-                                     ┌────────────────────────────┐
-                                     │  falco-talon (response,      │
-                                     │  optional — enforcement)     │
-                                     └────────────────────────────┘
-```
+
+Chi tiết từng phần: Driver → [[falco--drivers]] · Rule engine → [[falco--rules-syntax]] · Plugin framework → [[falco--falcoctl-plugins]] · Outputs → [[falco--outputs-falcosidekick]]
 
 - **Vị trí trong hệ thống**: chạy như **DaemonSet** trên mỗi K8s node (1 pod/node, để bắt syscall của toàn bộ container trên node đó), hoặc `systemd` service trên VM/bare-metal.
 - **Component chính**: driver (kernel visibility) → libscap/libsinsp (capture + state tracking process/container) → rule engine → plugin framework (mở rộng nguồn event, vd K8s audit log) → output channel.

@@ -14,18 +14,24 @@ Syscall-level detection (chạy trên node) không thấy được hành vi ở 
 
 ## How it works (flow/diagram)
 
-```
-┌─────────────────────────────┐        ┌──────────────────────────────┐
-│  K8s API Server               │        │  Mỗi Worker Node               │
-│  (Audit Policy + Webhook)     │        │  ┌────────────────────────┐   │
-│         │                     │        │  │ Falco DaemonSet Pod     │   │
-│         │ audit event (JSON)  │        │  │  - driver (syscall)     │   │
-│         ▼                     │        │  │  - k8saudit plugin      │◀──┼── webhook POST
-│  ┌────────────────┐           │        │  │    (nếu deploy webhook   │   │
-│  │ Falco k8saudit  │◀──────────────────┼──┤    server dạng Service) │   │
-│  │ webhook service │           │        │  └────────────────────────┘   │
-│  └────────────────┘           │        └──────────────────────────────┘
-└─────────────────────────────┘
+```d2
+direction: right
+
+apiserver: "K8s API Server\n(Audit Policy + Webhook)" {
+  trigger: "audit event (JSON)"
+}
+
+svc: "Falco k8saudit\nwebhook service"
+
+node: "Mỗi Worker Node" {
+  pod: "Falco DaemonSet Pod" {
+    driver: "driver (syscall)"
+    k8saudit: "k8saudit plugin\n(nếu deploy webhook\nserver dạng Service)"
+  }
+}
+
+apiserver.trigger -> svc
+svc -> node.pod.k8saudit: "webhook POST"
 ```
 
 2 cách phổ biến để đưa K8s Audit Log vào Falco:

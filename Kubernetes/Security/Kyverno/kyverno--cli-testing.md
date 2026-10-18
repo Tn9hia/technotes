@@ -17,14 +17,15 @@ Không có CLI, cách duy nhất để biết policy có đúng ý không là ap
 
 ## How it works (flow/diagram)
 
+```mermaid
+flowchart LR
+    A["policy.yaml + resource.yaml"] --> B["kyverno apply"] --> C["pass/fail/skip (validate)<br/>hoặc resource đã mutate (mutate)"]
 ```
-policy.yaml + resource.yaml ──▶ kyverno apply ──▶ pass/fail/skip (validate)
-                                                    hoặc resource đã mutate (mutate)
 
-kyverno-test.yaml (policy + resource + expected result)
-        │
-        ▼
-   kyverno test <path>  ──▶ so sánh actual vs expected ──▶ CI pass/fail
+```mermaid
+flowchart TD
+    D["kyverno-test.yaml<br/>(policy + resource + expected result)"] --> E["kyverno test &lt;path&gt;"]
+    E --> F["so sánh actual vs expected"] --> G["CI pass/fail"]
 ```
 
 ## Config gotchas

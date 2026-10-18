@@ -14,33 +14,26 @@ Quy trình xử lý khi có báo cáo "service lỗi/permission denied nghi do S
 
 ## How it works (flow/diagram)
 
-```
-1. Xác nhận đúng là SELinux, không phải DAC/firewall/app bug
-   ├─ setenforce 0 tạm (nếu môi trường cho phép) → lỗi biến mất? → đúng là SELinux
-   │  (nhớ setenforce 1 lại ngay sau khi xác nhận, đây chỉ là bước chẩn đoán)
-   └─ Không đổi được gì (lỗi vẫn còn ở permissive) → SAI hướng, quay lại tìm nguyên nhân khác
-        (DAC: ls -l ; firewall: firewall-cmd --list-all ; app config/log)
+```mermaid
+flowchart TD
+    S1["1. Xác nhận đúng là SELinux,<br/>không phải DAC/firewall/app bug"] --> S1Check{"setenforce 0 tạm<br/>→ lỗi biến mất?"}
+    S1Check -->|"Có → đúng là SELinux"| S1Confirm["setenforce 1 lại ngay<br/>sau khi xác nhận<br/>(đây chỉ là bước chẩn đoán)"]
+    S1Check -->|"Không (lỗi vẫn còn ở permissive)"| S1Wrong["SAI hướng, quay lại tìm nguyên nhân khác<br/>(DAC: ls -l; firewall: firewall-cmd --list-all; app log)"]
 
-2. Xem đúng bản ghi denial liên quan (không đoán)
-   ausearch -m AVC,USER_AVC,SELINUX_ERR,USER_SELINUX_ERR -ts recent
-   (lọc theo -c <comm> hoặc -p <pid> nếu log nhiều dòng nhiễu)
+    S1Confirm --> S2["2. Xem đúng bản ghi denial liên quan<br/>ausearch -m AVC,USER_AVC,SELINUX_ERR,USER_SELINUX_ERR -ts recent<br/>(lọc theo -c &lt;comm&gt; hoặc -p &lt;pid&gt;)"]
 
-3. Phân loại nguyên nhân bằng audit2why — 3 khả năng:
-   a) Label sai        → matchpathcon <path> để xem "đáng lẽ phải là gì"
-                          → semanage fcontext -a + restorecon (KHÔNG dùng chcon cho fix vĩnh viễn)
-   b) Thiếu boolean     → semanage boolean -l | grep <keyword> tìm boolean đúng
-                          → setsebool -P <bool> on (không bật tràn lan các boolean khác)
-   c) Thiếu port context (nếu liên quan network/bind)
-                          → semanage port -a -t <type> -p tcp <port>
-   d) Thật sự thiếu rule trong policy (hiếm, sau khi loại a/b/c)
-                          → cân nhắc custom module CÓ REVIEW, xem [[selinux--policy-modules]]
+    S2 --> S3{"3. Phân loại nguyên nhân<br/>bằng audit2why"}
+    S3 -->|"a) Label sai"| S3a["matchpathcon &lt;path&gt;<br/>→ semanage fcontext -a + restorecon<br/>(KHÔNG dùng chcon cho fix vĩnh viễn)"]
+    S3 -->|"b) Thiếu boolean"| S3b["semanage boolean -l | grep &lt;keyword&gt;<br/>→ setsebool -P &lt;bool&gt; on<br/>(không bật tràn lan boolean khác)"]
+    S3 -->|"c) Thiếu port context"| S3c["semanage port -a -t &lt;type&gt; -p tcp &lt;port&gt;"]
+    S3 -->|"d) Thật sự thiếu rule<br/>(hiếm, sau khi loại a/b/c)"| S3d["Cân nhắc custom module CÓ REVIEW"]
 
-4. Áp fix, xác nhận lại ở chế độ Enforcing (không phải permissive)
-   setenforce 1 (nếu đang ở bước debug permissive)
-   → test lại hành vi lỗi ban đầu
+    S3a --> S4
+    S3b --> S4
+    S3c --> S4
+    S3d --> S4
 
-5. Ghi lại: nguyên nhân gốc, lệnh đã chạy, ai duyệt (nếu là fcontext/boolean/module thay đổi
-   diện rộng) — để có audit trail, tránh "config trôi nổi không ai nhớ vì sao có"
+    S4["4. Áp fix, xác nhận lại ở chế độ Enforcing<br/>setenforce 1 (nếu đang debug permissive)<br/>→ test lại hành vi lỗi ban đầu"] --> S5["5. Ghi lại: nguyên nhân gốc, lệnh đã chạy,<br/>ai duyệt — để có audit trail"]
 ```
 
 ## Config gotchas

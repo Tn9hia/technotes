@@ -23,15 +23,12 @@ Type Enforcement cần một "chìa khoá" gắn cố định lên object để 
 
 Có 2 tầng cấu hình dễ nhầm với nhau:
 
-```
-semanage fcontext -a -t <type> "path_pattern"
-        │  (chỉ ghi vào DB policy: /etc/selinux/targeted/contexts/files/file_contexts.local)
-        │  KHÔNG đổi label của file đang tồn tại
-        ▼
-restorecon -Rv <path>
-        │  đọc DB policy ở trên, áp label thực tế lên file/dir đang tồn tại
-        ▼
-   File thực sự đổi context (xem lại bằng ls -Z)
+```mermaid
+flowchart TD
+    A["semanage fcontext -a -t &lt;type&gt; 'path_pattern'"] --> A1["Chỉ ghi vào DB policy:<br/>/etc/selinux/targeted/contexts/files/file_contexts.local<br/>KHÔNG đổi label của file đang tồn tại"]
+    A1 --> B["restorecon -Rv &lt;path&gt;"]
+    B --> B1["Đọc DB policy ở trên,<br/>áp label thực tế lên file/dir đang tồn tại"]
+    B1 --> C["File thực sự đổi context<br/>(xem lại bằng ls -Z)"]
 ```
 
 So sánh nhanh 3 lệnh hay bị lẫn:

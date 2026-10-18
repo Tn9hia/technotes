@@ -14,18 +14,16 @@ Manager không thể chấp nhận data từ nguồn chưa xác thực — nếu
 
 ## How it works (flow/diagram)
 
-```
-Agent mới cài                          Manager
-     │  1. connect :1515 (authd)           │
-     │  gửi registration_password (nếu có) │
-     ├─────────────────────────────────────▶
-     │                                      │  2. authd tạo agent ID + keypair
-     │  3. nhận key về                      │     (gán vào group "default"
-     ◀─────────────────────────────────────┤      trừ khi chỉ định group khác)
-     │  lưu vào client.keys                │
-     │                                      │
-     │  4. từ giờ dùng key này kết nối :1514 (remoted) cho log traffic thật
-     ├─────────────────────────────────────▶
+```mermaid
+sequenceDiagram
+    participant Agent as Agent mới cài
+    participant Manager
+
+    Agent->>Manager: 1. connect :1515 (authd)<br/>gửi registration_password (nếu có)
+    Note over Manager: 2. authd tạo agent ID + keypair<br/>(gán vào group "default"<br/>trừ khi chỉ định group khác)
+    Manager->>Agent: 3. trả key về
+    Note over Agent: lưu vào client.keys
+    Agent->>Manager: 4. dùng key này kết nối :1514 (remoted)<br/>cho log traffic thật
 ```
 
 Cách thủ công (không dùng authd): admin chạy `manage_agents` trên manager để add agent + export key, rồi import key đó vào agent bằng tay (`manage_agents -i`). An toàn hơn nhưng không scale.

@@ -14,21 +14,15 @@ Nếu để Falco tự tích hợp trực tiếp với từng backend (Slack API
 
 ## How it works (flow/diagram)
 
-```
-Falco (outputs.http/grpc enabled)
-        │  POST alert (JSON)
-        ▼
-┌─────────────────────┐
-│  Falcosidekick        │
-│  - nhận alert          │
-│  - filter theo priority/rule (tùy config)
-│  - fan-out tới N output│
-└──────────┬───────────┘
-           ├──▶ Slack/Teams (chat notification)
-           ├──▶ Elasticsearch/Loki (long-term storage, search)
-           ├──▶ S3/GCS (archive, compliance retention)
-           ├──▶ PagerDuty/Opsgenie (on-call paging)
-           └──▶ Prometheus (metrics: falcosidekick_outputs_total...)
+```mermaid
+flowchart TD
+    Falco["Falco<br/>(outputs.http / grpc enabled)"] -->|"POST alert (JSON)"| FS
+
+    FS["Falcosidekick<br/>- nhận alert<br/>- filter theo priority/rule (tùy config)<br/>- fan-out tới N output"] --> Slack["Slack / Teams<br/>(chat notification)"]
+    FS --> ES["Elasticsearch / Loki<br/>(long-term storage, search)"]
+    FS --> S3["S3 / GCS<br/>(archive, compliance retention)"]
+    FS --> PD["PagerDuty / Opsgenie<br/>(on-call paging)"]
+    FS --> Prom["Prometheus<br/>(metrics: falcosidekick_outputs_total...)"]
 ```
 
 `falcosidekick-ui` (tùy chọn thêm) cung cấp dashboard xem alert trực tiếp không cần cắm SIEM ngay từ đầu — hữu ích cho POC/giai đoạn đầu vận hành.

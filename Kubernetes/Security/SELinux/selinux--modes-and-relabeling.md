@@ -14,6 +14,17 @@ Enforcing/Permissive tách biệt "thi hành policy" khỏi "quan sát policy" �
 
 ## How it works (flow/diagram)
 
+```mermaid
+stateDiagram-v2
+    [*] --> Disabled
+    Disabled --> Enforcing: remove selinux=0 + autorelabel + reboot
+    Disabled --> Permissive: boot param enforcing=0 + autorelabel + reboot
+    Enforcing --> Permissive: setenforce 0 (tạm, mất khi reboot)
+    Permissive --> Enforcing: setenforce 1
+    Enforcing --> Disabled: grubby --args selinux=0 + reboot
+    Permissive --> Disabled: grubby --args selinux=0 + reboot
+```
+
 **Kiểm tra trạng thái:**
 ```bash
 getenforce          # Enforcing | Permissive | Disabled — trạng thái RUNTIME

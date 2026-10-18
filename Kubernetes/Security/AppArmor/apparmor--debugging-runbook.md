@@ -12,26 +12,13 @@ Triệu chứng phổ biến nhất khi mới bật `enforce`: app báo "Permiss
 
 ## How it works (flow chẩn đoán)
 
-```
-App lỗi "Permission denied" nhưng chmod/chown check OK
-        │
-        ▼
-grep log AppArmor (xem bảng bên dưới) → có dòng apparmor="DENIED" trùng thời điểm không?
-        │
-   ┌────┴────┐
-  Có          Không
-   │            │
-   ▼            ▼
-Đúng do      Lỗi thật ở
-AppArmor     tầng khác (DAC,
-profile      SELinux, code,...)
-   │
-   ▼
-Đọc field: operation / name / requested_mask / profile
-   │
-   ▼
-Fix: thêm rule vào profile → apparmor_parser -r → test lại
-(hoặc tạm aa-complain nếu cần app sống ngay, sửa profile sau)
+```mermaid
+flowchart TD
+    A["App lỗi 'Permission denied'<br/>nhưng chmod/chown check OK"] --> B{"grep log AppArmor:<br/>có dòng apparmor='DENIED'<br/>trùng thời điểm không?"}
+    B -->|Có| C["Đúng do AppArmor profile"]
+    B -->|Không| D["Lỗi thật ở tầng khác<br/>(DAC, SELinux, code...)"]
+    C --> E["Đọc field: operation / name /<br/>requested_mask / profile"]
+    E --> F["Fix: thêm rule vào profile →<br/>apparmor_parser -r → test lại<br/>(hoặc tạm aa-complain nếu cần<br/>app sống ngay, sửa profile sau)"]
 ```
 
 ### Lệnh tra log theo hệ thống

@@ -30,30 +30,23 @@ Container thường (runc) chỉ cách ly bằng namespace + cgroup + seccomp �
 
 ### **4. Where - Architecture — Nó nằm ở đâu trong hệ thống?**
 
-```
-┌─────────────────────────── Host Linux Kernel ───────────────────────────┐
-│                                                                          │
-│   ┌──────────────── gVisor Sandbox (1 process opaque với host) ─────┐   │
-│   │                                                                  │  │
-│   │   App process(es)  <-- syscall/page fault --> [ Sentry ]        │  │
-│   │   (chạy code KHÔNG sửa đổi, ELF x86_64/ARM64)     │              │  │
-│   │                                                    │ re-impl:    │  │
-│   │                                                    │ - syscall   │  │
-│   │                                                    │ - mm        │  │
-│   │                                                    │ - netstack  │  │
-│   │                                                    │ - fs (VFS)  │  │
-│   │                                                    │ - proc mgmt │  │
-│   │                                                    ▼             │  │
-│   └──────────── [platform: systrap|KVM|ptrace] ──────────────────────┘  │
-│                          │ (giới hạn syscall qua seccomp-bpf)           │
-│                          │ (AF_PACKET socket cho network)               │
-│                          ▼                                             │
-│                    ┌───────────┐   LISAFS protocol                     │
-│                    │   Gofer   │◄──────────────────────► host FS thật  │
-│                    │ (process  │   (file descriptor qua SCM_RIGHTS,    │
-│                    │  riêng)   │    hoặc directfs FD donation)         │
-│                    └───────────┘                                       │
-└──────────────────────────────────────────────────────────────────────────┘
+```d2
+direction: down
+
+host: "Host Linux Kernel" {
+  sandbox: "gVisor Sandbox\n(1 process opaque với host)" {
+    app: "App process(es)\n(chạy code KHÔNG sửa đổi,\nELF x86_64/ARM64)"
+    sentry: "Sentry\nre-impl: syscall, mm, netstack,\nfs (VFS), proc mgmt"
+    app -> sentry: "syscall / page fault"
+  }
+
+  gofer: "Gofer\n(process riêng)"
+
+  sandbox -> gofer: "qua platform (systrap | KVM | ptrace)\ngiới hạn syscall bằng seccomp-bpf\n(AF_PACKET socket cho network)"
+}
+
+hostfs: "host FS thật"
+gofer -> hostfs: "LISAFS protocol\n(file descriptor qua SCM_RIGHTS,\nhoặc directfs FD donation)"
 ```
 
 - **Component chính**: `runsc` (CLI/OCI runtime) → spawn ra 2 tiến trình host thật: **Sentry** (kernel giả, xử lý syscall) và **Gofer** (proxy filesystem, ít quyền hơn 1 chút). Optional: `containerd-shim-runsc-v1` khi tích hợp containerd/K8s.
